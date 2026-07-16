@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - ALL 4 CORNERS RESIZE, FIXES, & UI SETTINGS ]] --
+-- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED MISC TAB ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
@@ -411,7 +411,6 @@ function DaleyUI:CreateWindow(config)
     local resizeStartPos = nil
 
     for cornerName, info in pairs(resizeHandles) do
-        -- Transparent 1x1 asset resolves standard engine-level drag-locking
         local Handle = Instance.new("ImageButton")
         Handle.Name                   = cornerName .. "_Resize"
         Handle.Size                   = UDim2.new(0, 16, 0, 16)
@@ -436,7 +435,7 @@ function DaleyUI:CreateWindow(config)
     -- InputChanged Handler checking custom safety state
     UserInputService.InputChanged:Connect(function(i)
         if activeResize then
-            -- Fallback verification using custom state tracker (Stops resizing instantly if mouse released)
+            -- Fallback verification using custom state tracker
             if not isLeftMouseDown then
                 activeResize = false
                 activeCorner = nil
@@ -514,7 +513,7 @@ function DaleyUI:CreateWindow(config)
             end
         end)
 
-        -- Scrollable Main Pages
+        -- Scrollable Pages
         local Page = Instance.new("ScrollingFrame")
         Page.Name                   = name .. "_Page"
         Page.Size                   = UDim2.new(1, 0, 1, 0)
@@ -975,17 +974,197 @@ function DaleyUI:CreateWindow(config)
             }
         end
 
+        -- =====================================================================
+        -- [[ DYNAMIC ROTATABLE COLOR WHEEL ELEMENT ]] --
+        -- =====================================================================
+        function Tab:CreateColorPicker(config)
+            config = config or {}
+            local name = config.Name or "Color Picker"
+            local defaultColor = config.Default or Color3.fromRGB(255, 50, 50)
+            local callback = config.Callback or function() end
+
+            local PickerRow = Instance.new("Frame")
+            PickerRow.Size = UDim2.new(1, 0, 0, 140)
+            PickerRow.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            PickerRow.BorderSizePixel = 0
+            PickerRow.ZIndex = 5
+            PickerRow.Parent = Page
+            Instance.new("UICorner", PickerRow).CornerRadius = UDim.new(0, 7)
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(0.4, 0, 0, 30)
+            Label.Position = UDim2.new(0, 12, 0, 10)
+            Label.BackgroundTransparency = 1
+            Label.Text = name
+            Label.TextColor3 = Color3.fromRGB(215, 215, 222)
+            Label.TextSize = 12
+            Label.Font = Enum.Font.GothamMedium
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.ZIndex = 6
+            Label.Parent = PickerRow
+
+            -- Current Color Indicator Box
+            local ColorPreview = Instance.new("Frame")
+            ColorPreview.Size = UDim2.new(0, 50, 0, 20)
+            ColorPreview.Position = UDim2.new(0, 12, 0, 45)
+            ColorPreview.BackgroundColor3 = defaultColor
+            ColorPreview.BorderSizePixel = 0
+            ColorPreview.ZIndex = 6
+            ColorPreview.Parent = PickerRow
+            Instance.new("UICorner", ColorPreview).CornerRadius = UDim.new(0, 4)
+
+            local PreviewStroke = Instance.new("UIStroke", ColorPreview)
+            PreviewStroke.Color = Color3.fromRGB(45, 45, 55)
+            PreviewStroke.Thickness = 1
+
+            -- Color Wheel Image (Radial HSV Color Map Asset)
+            local Wheel = Instance.new("ImageButton")
+            Wheel.Size = UDim2.new(0, 100, 0, 100)
+            Wheel.Position = UDim2.new(1, -240, 0.5, -50)
+            Wheel.BackgroundTransparency = 1
+            Wheel.Image = "rbxassetid://415583266" -- Default High-Res Color Wheel asset
+            Wheel.ZIndex = 7
+            Wheel.Parent = PickerRow
+
+            -- Cursor Selection Pin
+            local WheelPin = Instance.new("Frame")
+            WheelPin.Size = UDim2.new(0, 8, 0, 8)
+            WheelPin.AnchorPoint = Vector2.new(0.5, 0.5)
+            WheelPin.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            WheelPin.BorderSizePixel = 0
+            WheelPin.ZIndex = 8
+            WheelPin.Parent = Wheel
+            Instance.new("UICorner", WheelPin).CornerRadius = UDim.new(1, 0)
+            Instance.new("UIStroke", WheelPin).Color = Color3.fromRGB(0, 0, 0)
+
+            -- Saturation / Value Vertical Slider Bar
+            local ValSlider = Instance.new("TextButton")
+            ValSlider.Size = UDim2.new(0, 15, 0, 100)
+            ValSlider.Position = UDim2.new(1, -110, 0.5, -50)
+            ValSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            ValSlider.BorderSizePixel = 0
+            ValSlider.Text = ""
+            ValSlider.ZIndex = 7
+            ValSlider.Parent = PickerRow
+            Instance.new("UICorner", ValSlider).CornerRadius = UDim.new(0, 4)
+
+            local ValGradient = Instance.new("UIGradient")
+            ValGradient.Rotation = 90
+            ValGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            })
+            ValGradient.Parent = ValSlider
+
+            local ValPin = Instance.new("Frame")
+            ValPin.Size = UDim2.new(1, 4, 0, 4)
+            ValPin.Position = UDim2.new(0, -2, 0, 0)
+            ValPin.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            ValPin.BorderSizePixel = 0
+            ValPin.ZIndex = 8
+            ValPin.Parent = ValSlider
+            Instance.new("UIStroke", ValPin).Color = Color3.fromRGB(0, 0, 0)
+
+            -- Internal State
+            local currentH, currentS, currentV = defaultColor:ToHSV()
+            local pickingWheel = false
+            local pickingVal = false
+
+            local function updateColor()
+                local finalColor = Color3.fromHSV(currentH, currentS, currentV)
+                ColorPreview.BackgroundColor3 = finalColor
+                ValGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(currentH, currentS, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+                })
+                callback(finalColor)
+            end
+
+            -- Place initial pins based on default color HSV calculations
+            local function updatePins()
+                local r = currentS * 50
+                local angle = currentH * (math.pi * 2)
+                WheelPin.Position = UDim2.new(0, 50 + math.cos(angle) * r, 0, 50 - math.sin(angle) * r)
+                ValPin.Position = UDim2.new(0, -2, 1 - currentV, -2)
+            end
+
+            -- Update HSV based on selection position within the Color Wheel circle boundary
+            local function processWheel(x, y)
+                local rPos = Vector2.new(x - Wheel.AbsolutePosition.X - 50, y - Wheel.AbsolutePosition.Y - 50)
+                local dist = math.clamp(rPos.Magnitude, 0, 50)
+                local angle = math.atan2(-rPos.Y, rPos.X)
+                if angle < 0 then angle = angle + (math.pi * 2) end
+                
+                currentH = angle / (math.pi * 2)
+                currentS = dist / 50
+                WheelPin.Position = UDim2.new(0, 50 + math.cos(angle) * dist, 0, 50 - math.sin(angle) * dist)
+                updateColor()
+            end
+
+            local function processSlider(y)
+                local pct = math.clamp((y - ValSlider.AbsolutePosition.Y) / ValSlider.AbsoluteSize.Y, 0, 1)
+                currentV = 1 - pct
+                ValPin.Position = UDim2.new(0, -2, pct, -2)
+                updateColor()
+            end
+
+            -- Input Listeners
+            Wheel.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingWheel = true
+                    processWheel(i.Position.X, i.Position.Y)
+                end
+            end)
+
+            ValSlider.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingVal = true
+                    processSlider(i.Position.Y)
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+                    if pickingWheel then
+                        processWheel(i.Position.X, i.Position.Y)
+                    elseif pickingVal then
+                        processSlider(i.Position.Y)
+                    end
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingWheel = false
+                    pickingVal = false
+                end
+            end)
+
+            updatePins()
+            updateColor()
+
+            return {
+                SetColor = function(color)
+                    currentH, currentS, currentV = color:ToHSV()
+                    updatePins()
+                    updateColor()
+                end
+            end
+        end
+
         return Tab
     end
 
     -- =========================================================================
-    -- [[ AUTOMATIC UI SETTINGS TAB GENERATION ]] --
+    -- [[ AUTOMATIC COMBINED "MISC" TAB GENERATION ]] --
     -- =========================================================================
-    local SettingsTab = Window:CreateTab("UI Settings")
-    SettingsTab:CreateSection("Customization Settings")
+    local MiscTab = Window:CreateTab("Misc")
+
+    -- Customization Settings Section
+    MiscTab:CreateSection("Customization Settings")
 
     -- Toggle RGB Outline
-    SettingsTab:CreateToggle({
+    MiscTab:CreateToggle({
         Name = "RGB Outline Theme",
         Default = UISettings.RGBOutline,
         Callback = function(v)
@@ -994,7 +1173,7 @@ function DaleyUI:CreateWindow(config)
     })
 
     -- Background Stars Toggle
-    SettingsTab:CreateToggle({
+    MiscTab:CreateToggle({
         Name = "Background Starfield",
         Default = UISettings.StarsEnabled,
         Callback = function(v)
@@ -1002,48 +1181,20 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
-    -- Setup Preset Outline Palette Picker
-    local ColorMap = {
-        Red    = Color3.fromRGB(255, 50, 50),
-        Orange = Color3.fromRGB(255, 140, 0),
-        Yellow = Color3.fromRGB(255, 215, 0),
-        Green  = Color3.fromRGB(50, 205, 50),
-        Blue   = Color3.fromRGB(50, 150, 255),
-        Purple = Color3.fromRGB(138, 43, 226),
-        Pink   = Color3.fromRGB(255, 105, 180),
-        Black  = Color3.fromRGB(25, 25, 25),
-        White  = Color3.fromRGB(255, 255, 255)
-    }
-
-    local presets = {"Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Black", "White"}
-    SettingsTab:CreateDropdown({
-        Name = "Theme Outline Color",
-        Options = presets,
-        Callback = function(selectedName)
-            if ColorMap[selectedName] then
-                UISettings.OutlineColor = ColorMap[selectedName]
-            end
+    -- Interactive Color Wheel for Theme Color selection (Replaced custom typing)
+    MiscTab:CreateColorPicker({
+        Name = "Theme Outline Color Picker",
+        Default = UISettings.OutlineColor,
+        Callback = function(color)
+            UISettings.OutlineColor = color
         end
     })
 
-    -- Custom RGB Color Picker Input
-    SettingsTab:CreateTextBox({
-        Name = "Custom Theme RGB (e.g. 255,0,0)",
-        Callback = function(inputStr)
-            local r, g, b = inputStr:match("(%d+),%s*(%d+),%s*(%d+)")
-            if r and g and b then
-                local RVal = math.clamp(tonumber(r), 0, 255)
-                local GVal = math.clamp(tonumber(g), 0, 255)
-                local BVal = math.clamp(tonumber(b), 0, 255)
-                UISettings.OutlineColor = Color3.fromRGB(RVal, GVal, BVal)
-            end
-        end
-    })
-
-    SettingsTab:CreateSection("Control Controls")
+    -- Control Settings Section
+    MiscTab:CreateSection("Control Settings")
 
     -- Keybind Change Configuration Box
-    SettingsTab:CreateTextBox({
+    MiscTab:CreateTextBox({
         Name = "Change UI Toggle Key (e.g. K, P, L)",
         Callback = function(val)
             local targetKey = string.upper(val:sub(1,1))
