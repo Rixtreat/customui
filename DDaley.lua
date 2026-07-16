@@ -17,20 +17,18 @@ local LP = Players.LocalPlayer
 local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
 -- =========================================================================
--- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS & NIL ARGUMENTS) ]] --
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
 -- =========================================================================
 local isLeftMouseDown = false
 
 UserInputService.InputBegan:Connect(function(input)
-    -- Added safety check 'if input and ...' to prevent index nil errors
-    if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    -- Added safety check 'if input and ...' to prevent index nil errors
-    if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = false
     end
 end)
@@ -61,7 +59,7 @@ function DaleyUI:CreateWindow(config)
     local discordLink = tostring(rawDiscord)
 
     -- Cleanup existing
-    if TargetParent and TargetParent:FindFirstChild("DaleyStarfieldUI") then
+    if TargetParent:FindFirstChild("DaleyStarfieldUI") then
         TargetParent.DaleyStarfieldUI:Destroy()
     end
 
@@ -70,9 +68,7 @@ function DaleyUI:CreateWindow(config)
     ScreenGui.Name           = "DaleyStarfieldUI"
     ScreenGui.ResetOnSpawn   = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    if TargetParent then
-        ScreenGui.Parent     = TargetParent
-    end
+    ScreenGui.Parent         = TargetParent
 
     -- Main Window Frame
     local WindowFrame = Instance.new("Frame")
@@ -1153,7 +1149,7 @@ function DaleyUI:CreateWindow(config)
                     updatePins()
                     updateColor()
                 end
-            end
+            }
         end
 
         return Tab
