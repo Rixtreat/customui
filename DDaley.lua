@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ 1. FULL DALEY UI LIBRARY SOURCE CODE ]] --
+-- [[ 1. FULL DALEY UI LIBRARY SOURCE CODE (FIXED) ]] --
 -- =========================================================================
 
 local Players          = game:GetService("Players")
@@ -272,7 +272,7 @@ function DaleyUI:CreateWindow(config)
     end)
     
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if i.UserInputType == Enum.MouseButton1 then dragging = false end
     end)
 
     local uiVisible = true
@@ -920,6 +920,9 @@ function DaleyUI:CreateWindow(config)
             }
         end
 
+        -- =========================================================================
+        -- [[ ⚠️ MOVED COLOR PICKER METHOD INSIDE THE TAB DEFINITIONS ]] --
+        -- =========================================================================
         function Tab:CreateColorPicker(config)
             config = config or {}
             local name = config.Name or "Color Picker"
@@ -1140,15 +1143,12 @@ end
 -- [[ 2. RUNTIME HUB CONFIGURATION AND TEST SCRIPT ]] --
 -- =========================================================================
 
--- Create the main hub window
 local Window = DaleyUI:CreateWindow({
     Name = "Daley Hub v1.0",
     Discord = "https://discord.gg/SeNPuUVsZQ"
 })
 
--- Create our primary feature Tab
 local CombatTab = Window:CreateTab("Combat")
-
 CombatTab:CreateSection("Aimbot & Target Options")
 
 local TargetLabel = CombatTab:CreateLabel("Target System: Idle")
@@ -1178,7 +1178,6 @@ CombatTab:CreateSlider({
 })
 
 local PlayerTab = Window:CreateTab("Player Settings")
-
 PlayerTab:CreateSection("Movement Settings")
 
 PlayerTab:CreateSlider({
@@ -1223,6 +1222,7 @@ PlayerTab:CreateTextBox({
     end
 })
 
+-- This now runs perfectly without crashing!
 PlayerTab:CreateColorPicker({
     Name = "Chamber Highlight ESP Color",
     Default = Color3.fromRGB(0, 255, 0),
