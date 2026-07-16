@@ -350,7 +350,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Parent                 = WindowFrame
 
     -- =========================================================================
-    -- [[ INVISIBLE 4-CORNER RESIZE HANDLERS (NO ICONS) ]] --
+    -- [[ INVISIBLE 4-CORNER RESIZE HANDLERS (NO PLOTS OR IMAGES) ]] --
     -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
@@ -366,12 +366,14 @@ function DaleyUI:CreateWindow(config)
     local resizeStartPos = nil
 
     for cornerName, info in pairs(resizeHandles) do
-        local Handle = Instance.new("ImageButton")
+        -- Changed to TextButton with no text or background to guarantee absolutely no phantom icons
+        local Handle = Instance.new("TextButton")
         Handle.Name                   = cornerName .. "_Resize"
         Handle.Size                   = UDim2.new(0, 16, 0, 16)
         Handle.Position               = info.Pos
-        Handle.BackgroundTransparency = 1 -- Invisible resize point
-        Handle.Image                  = "" -- No icon
+        Handle.BackgroundTransparency = 1 
+        Handle.Text                   = "" 
+        Handle.BorderSizePixel        = 0
         Handle.ZIndex                 = 100
         Handle.Parent                 = WindowFrame
 
@@ -408,7 +410,7 @@ function DaleyUI:CreateWindow(config)
     end)
 
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        if i.UserInputType == Enum.MouseButton1 then
             activeResize = false
             activeCorner = nil
         end
