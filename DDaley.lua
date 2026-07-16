@@ -1,10 +1,8 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - UPDATED ]] --
+-- [[ DALEY UI LIBRARY - FINAL UPDATED ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub" })
---   local Tab = Window:CreateTab("Tab Name")
---   Tab:CreateToggle({ Name = "Speed", Default = false, Callback = function(v) end })
 -- =========================================================================
 
 local Players          = game:GetService("Players")
@@ -69,7 +67,7 @@ function DaleyUI:CreateWindow(config)
         end
     end)
 
-    -- Starfield
+    -- Starfield Star Container
     local StarContainer = Instance.new("Frame")
     StarContainer.Size                   = UDim2.new(1, 0, 1, 0)
     StarContainer.BackgroundTransparency = 1
@@ -184,7 +182,7 @@ function DaleyUI:CreateWindow(config)
     MinBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
         TweenService:Create(WindowFrame, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = minimized and UDim2.new(0, 650, 0, 46) or originalSize
+            Size = minimized and UDim2.new(0, WindowFrame.Size.X.Offset, 0, 46) or UDim2.new(0, WindowFrame.Size.X.Offset, 0, originalSize.Y.Offset)
         }):Play()
     end)
 
@@ -215,7 +213,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = false
     end)
 
-    -- Drag
+    -- Drag System
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -237,7 +235,52 @@ function DaleyUI:CreateWindow(config)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 
-    -- Divider
+    -- =========================================================================
+    -- [[ "K" KEYBIND TOGGLE WITH SCALE ANIMATION ]] --
+    -- =========================================================================
+    local uiVisible = true
+    local animating = false
+
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == Enum.KeyCode.K then
+            if animating then return end
+            animating = true
+            uiVisible = not uiVisible
+
+            if uiVisible then
+                -- Open Animation
+                WindowFrame.Visible = true
+                WindowFrame.ClipsDescendants = true
+                TweenService:Create(WindowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Size = originalSize
+                }):Play()
+                local t = TweenService:Create(WindowFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundTransparency = 0
+                })
+                t:Play()
+                t.Completed:Wait()
+                WindowFrame.ClipsDescendants = false
+                animating = false
+            else
+                -- Close Animation
+                originalSize = WindowFrame.Size -- capture current size (accounts for resizing)
+                WindowFrame.ClipsDescendants = true
+                TweenService:Create(WindowFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0, 0, 0, 0)
+                }):Play()
+                local t = TweenService:Create(WindowFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    BackgroundTransparency = 1
+                })
+                t:Play()
+                t.Completed:Wait()
+                WindowFrame.Visible = false
+                animating = false
+            end
+        end
+    end)
+
+    -- Divider Line
     local Divider = Instance.new("Frame")
     Divider.Size             = UDim2.new(1, 0, 0, 1)
     Divider.Position         = UDim2.new(0, 0, 0, 46)
@@ -246,7 +289,7 @@ function DaleyUI:CreateWindow(config)
     Divider.ZIndex           = 5
     Divider.Parent           = WindowFrame
 
-    -- Sidebar
+    -- Sidebar (Fitted with dynamic width/height sizing)
     local Sidebar = Instance.new("Frame")
     Sidebar.Size             = UDim2.new(0, 158, 1, -46)
     Sidebar.Position         = UDim2.new(0, 0, 0, 46)
@@ -283,6 +326,45 @@ function DaleyUI:CreateWindow(config)
     PageContainer.ClipsDescendants       = true
     PageContainer.ZIndex                 = 3
     PageContainer.Parent                 = WindowFrame
+
+    -- =========================================================================
+    -- [[ MOUSE RESIZE SYSTEM ]] --
+    -- =========================================================================
+    local ResizeHandle = Instance.new("ImageButton")
+    ResizeHandle.Size                   = UDim2.new(0, 16, 0, 16)
+    ResizeHandle.Position               = UDim2.new(1, -16, 1, -16)
+    ResizeHandle.BackgroundTransparency = 1
+    ResizeHandle.Image                  = "rbxassetid://1234567" -- invisible hit container
+    ResizeHandle.ZIndex                 = 100
+    ResizeHandle.Parent                 = WindowFrame
+
+    local resizing = false
+    local resizeStart = nil
+    local startSize = nil
+
+    ResizeHandle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            resizing = true
+            resizeStart = i.Position
+            startSize = WindowFrame.Size
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(i)
+        if resizing and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = i.Position - resizeStart
+            local newWidth = math.clamp(startSize.X.Offset + delta.X, 480, 950) -- min/max limits
+            local newHeight = math.clamp(startSize.Y.Offset + delta.Y, 280, 650)
+            WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+            originalSize = WindowFrame.Size
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            resizing = false
+        end
+    end)
 
     local activeTabBtn = nil
 
@@ -686,14 +768,20 @@ function DaleyUI:CreateWindow(config)
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
-            local DropFrame = Instance.new("Frame")
-            DropFrame.Size             = UDim2.new(1, 0, 0, #list * 28)
-            DropFrame.Position         = UDim2.new(0, 0, 1, 3)
-            DropFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-            DropFrame.BorderSizePixel  = 0
-            DropFrame.Visible          = false
-            DropFrame.ZIndex           = 20
-            DropFrame.Parent           = Wrapper
+            -- =========================================================================
+            -- [[ SCROLLABLE DROPDOWN CONTAINER ]][cite: 1]
+            -- =========================================================================
+            local DropFrame = Instance.new("ScrollingFrame")
+            DropFrame.Size                   = UDim2.new(1, 0, 0, math.clamp(#list * 28, 0, 140))
+            DropFrame.Position               = UDim2.new(0, 0, 1, 3)
+            DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
+            DropFrame.BorderSizePixel        = 0
+            DropFrame.Visible                = false
+            DropFrame.ZIndex                 = 20
+            DropFrame.ScrollBarThickness     = 3
+            DropFrame.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
+            DropFrame.CanvasSize             = UDim2.new(0, 0, 0, #list * 28)
+            DropFrame.Parent                 = Wrapper
             Instance.new("UICorner", DropFrame).CornerRadius = UDim.new(0, 6)
 
             local DStroke = Instance.new("UIStroke", DropFrame)
@@ -711,7 +799,7 @@ function DaleyUI:CreateWindow(config)
             -- Helper function to generate item buttons
             local function createOptionButton(item)
                 local Opt = Instance.new("TextButton")
-                Opt.Size                   = UDim2.new(1, 0, 0, 28)
+                Opt.Size                   = UDim2.new(1, -5, 0, 28) -- Leave offset spacing for red scrollbar
                 Opt.BackgroundTransparency = 1
                 Opt.Text                   = item
                 Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
@@ -744,7 +832,7 @@ function DaleyUI:CreateWindow(config)
                 Get = function() 
                     return SelBtn.Text 
                 end,
-                -- Newly added Refresh function to dynamically swap lists on the fly!
+                -- Newly added Refresh function to dynamically swap lists on the fly![cite: 1]
                 Refresh = function(self, newList)
                     newList = newList or {}
                     
@@ -755,8 +843,9 @@ function DaleyUI:CreateWindow(config)
                         end
                     end
                     
-                    -- Resize the background canvas container
-                    DropFrame.Size = UDim2.new(1, 0, 0, #newList * 28)
+                    -- Resize dropdown visual container and canvas heights dynamically[cite: 1]
+                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(#newList * 28, 0, 140))
+                    DropFrame.CanvasSize = UDim2.new(0, 0, 0, #newList * 28)
                     
                     -- Generate new option list buttons
                     for _, item in ipairs(newList) do
