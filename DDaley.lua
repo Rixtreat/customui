@@ -17,18 +17,20 @@ local LP = Players.LocalPlayer
 local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
 -- =========================================================================
--- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXED COMPARISON ERRORS) ]] --
 -- =========================================================================
 local isLeftMouseDown = false
 
 UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    -- Using .Name comparison avoids nil value errors in restricted executors
+    if input.UserInputType and input.UserInputType.Name == "MouseButton1" then
         isLeftMouseDown = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    -- Using .Name comparison avoids nil value errors in restricted executors
+    if input.UserInputType and input.UserInputType.Name == "MouseButton1" then
         isLeftMouseDown = false
     end
 end)
@@ -281,7 +283,7 @@ function DaleyUI:CreateWindow(config)
     -- Drag System with Custom State Safeguard
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        if i.UserInputType and i.UserInputType.Name == "MouseButton1" then
             dragging  = true
             dragStart = i.Position
             startPos  = WindowFrame.Position
@@ -295,7 +297,7 @@ function DaleyUI:CreateWindow(config)
                 dragging = false
                 return
             end
-            if i.UserInputType == Enum.UserInputType.MouseMovement then
+            if i.UserInputType and i.UserInputType.Name == "MouseMovement" then
                 local delta = i.Position - dragStart
                 WindowFrame.Position = UDim2.new(
                     startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -306,7 +308,7 @@ function DaleyUI:CreateWindow(config)
     end)
     
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if i.UserInputType and i.UserInputType.Name == "MouseButton1" then dragging = false end
     end)
 
     -- Keybind Toggle with Scale Animation
@@ -422,7 +424,7 @@ function DaleyUI:CreateWindow(config)
         Handle.Parent                 = WindowFrame
 
         Handle.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            if i.UserInputType and i.UserInputType.Name == "MouseButton1" then
                 activeResize     = true
                 activeCorner     = info
                 resizeStartMouse = i.Position
@@ -442,7 +444,7 @@ function DaleyUI:CreateWindow(config)
                 return
             end
             
-            if i.UserInputType == Enum.UserInputType.MouseMovement then
+            if i.UserInputType and i.UserInputType.Name == "MouseMovement" then
                 local delta = i.Position - resizeStartMouse
                 
                 local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
@@ -462,7 +464,7 @@ function DaleyUI:CreateWindow(config)
     end)
 
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        if i.UserInputType and i.UserInputType.Name == "MouseButton1" then
             activeResize = false
             activeCorner = nil
         end
@@ -764,18 +766,19 @@ function DaleyUI:CreateWindow(config)
             end
 
             Track.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then
+                if i.UserInputType and (i.UserInputType.Name == "MouseButton1" or i.UserInputType.Name == "Touch") then
                     draggingSlider = true; update(i.Position.X)
                 end
             end)
             UserInputService.InputChanged:Connect(function(i)
-                if draggingSlider and (i.UserInputType == Enum.UserInputType.MouseMovement
-                or i.UserInputType == Enum.UserInputType.Touch) then update(i.Position.X) end
+                if draggingSlider and i.UserInputType and (i.UserInputType.Name == "MouseMovement" or i.UserInputType.Name == "Touch") then 
+                    update(i.Position.X) 
+                end
             end)
             UserInputService.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then draggingSlider = false end
+                if i.UserInputType and (i.UserInputType.Name == "MouseButton1" or i.UserInputType.Name == "Touch") then 
+                    draggingSlider = false 
+                end
             end)
         end
 
@@ -1110,21 +1113,21 @@ function DaleyUI:CreateWindow(config)
 
             -- Input Listeners
             Wheel.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                if i.UserInputType and (i.UserInputType.Name == "MouseButton1" or i.UserInputType.Name == "Touch") then
                     pickingWheel = true
                     processWheel(i.Position.X, i.Position.Y)
                 end
             end)
 
             ValSlider.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                if i.UserInputType and (i.UserInputType.Name == "MouseButton1" or i.UserInputType.Name == "Touch") then
                     pickingVal = true
                     processSlider(i.Position.Y)
                 end
             end)
 
             UserInputService.InputChanged:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+                if i.UserInputType and (i.UserInputType.Name == "MouseMovement" or i.UserInputType.Name == "Touch") then
                     if pickingWheel then
                         processWheel(i.Position.X, i.Position.Y)
                     elseif pickingVal then
@@ -1134,7 +1137,7 @@ function DaleyUI:CreateWindow(config)
             end)
 
             UserInputService.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                if i.UserInputType and (i.UserInputType.Name == "MouseButton1" or i.UserInputType.Name == "Touch") then
                     pickingWheel = false
                     pickingVal = false
                 end
