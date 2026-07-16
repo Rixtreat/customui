@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY ]] --
+-- [[ DALEY UI LIBRARY - UPDATED ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub" })
@@ -708,7 +708,8 @@ function DaleyUI:CreateWindow(config)
                 DropFrame.Visible = open
             end)
 
-            for _, item in ipairs(list) do
+            -- Helper function to generate item buttons
+            local function createOptionButton(item)
                 local Opt = Instance.new("TextButton")
                 Opt.Size                   = UDim2.new(1, 0, 0, 28)
                 Opt.BackgroundTransparency = 1
@@ -733,7 +734,48 @@ function DaleyUI:CreateWindow(config)
                 end)
             end
 
-            return { Get = function() return SelBtn.Text end }
+            -- Build initial items
+            for _, item in ipairs(list) do
+                createOptionButton(item)
+            end
+
+            -- Return the dropdown API object
+            return {
+                Get = function() 
+                    return SelBtn.Text 
+                end,
+                -- Newly added Refresh function to dynamically swap lists on the fly!
+                Refresh = function(self, newList)
+                    newList = newList or {}
+                    
+                    -- Clear old text option elements
+                    for _, child in ipairs(DropFrame:GetChildren()) do
+                        if child:IsA("TextButton") then
+                            child:Destroy()
+                        end
+                    end
+                    
+                    -- Resize the background canvas container
+                    DropFrame.Size = UDim2.new(1, 0, 0, #newList * 28)
+                    
+                    -- Generate new option list buttons
+                    for _, item in ipairs(newList) do
+                        createOptionButton(item)
+                    end
+                    
+                    -- Fallback text check
+                    local found = false
+                    for _, item in ipairs(newList) do
+                        if item == SelBtn.Text then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        SelBtn.Text = newList[1] or "Select"
+                    end
+                end
+            }
         end
 
         return Tab
