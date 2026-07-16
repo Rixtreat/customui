@@ -39,6 +39,19 @@ end)
 local DaleyUI = {}
 DaleyUI.__index = DaleyUI
 
+-- =========================================================================
+-- [[ INITIALIZE LIBRARY ]] --
+-- =========================================================================
+function DaleyUI:CreateWindow(config)
+    local Window = {}
+    Window.__index = Window
+    
+    -- Add your UI creation logic here
+    print("Window created: " .. (config.Name or "Default"))
+    
+    return Window
+end
+
 -- Global Settings Reference (Shared between Library, Windows, and UI Settings)
 local UISettings = {
     RGBOutline = true,
