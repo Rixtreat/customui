@@ -42,15 +42,23 @@ DaleyUI.__index = DaleyUI
 -- =========================================================================
 -- [[ INITIALIZE LIBRARY ]] --
 -- =========================================================================
+-- ... (Your setup code above) ...
+
 function DaleyUI:CreateWindow(config)
+    -- 1. Create the base Window table
     local Window = {}
     Window.__index = Window
-    
-    -- Add your UI creation logic here
-    print("Window created: " .. (config.Name or "Default"))
-    
+
+    -- 2. PASTE ALL YOUR UI LOGIC HERE
+    -- This includes:
+    --   Window:CreateTab = function(name) ... end
+    --   All your screen creation, UI elements, etc.
+
+    -- 3. Return the fully built Window object
     return Window
 end
+
+return DaleyUI
 
 -- Global Settings Reference (Shared between Library, Windows, and UI Settings)
 local UISettings = {
