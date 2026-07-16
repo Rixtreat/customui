@@ -492,7 +492,7 @@ function DaleyUI:CreateWindow(config)
         Btn.Font                   = Enum.Font.GothamMedium
         Btn.TextXAlignment         = Enum.TextXAlignment.Left
         Btn.ZIndex                 = 4
-        Btn.LayoutOrder            = layoutOrder or tabCount -- Custom layout override
+        Btn.LayoutOrder            = layoutOrder or tabCount -- High custom priority defaults or standard auto-incremental ordering
         Btn.Parent                 = TabContainer
         Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -576,7 +576,8 @@ function DaleyUI:CreateWindow(config)
             TweenService:Create(Accent, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
         end)
 
-        if not activeTabBtn then
+        -- Auto-select first loaded tab ONLY if it is not UI Settings
+        if not activeTabBtn and name ~= "UI Settings" then
             activeTabBtn = Btn
             Page.Visible = true
             Btn.TextColor3             = Color3.fromRGB(255, 255, 255)
@@ -788,17 +789,26 @@ function DaleyUI:CreateWindow(config)
             local text     = config.Name     or "Button"
             local callback = config.Callback or function() end
 
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 38)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
             local Btn = Instance.new("TextButton")
-            Btn.Size             = UDim2.new(1, 0, 0, 36)
-            Btn.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+            Btn.Size             = UDim2.new(1, -24, 0, 26)
+            Btn.Position         = UDim2.new(0, 12, 0.5, -13)
+            Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
             Btn.Text             = text
             Btn.TextColor3       = Color3.fromRGB(235, 235, 242)
-            Btn.TextSize         = 12
+            Btn.TextSize         = 11
             Btn.Font             = Enum.Font.GothamBold
             Btn.BorderSizePixel  = 0
-            Btn.ZIndex           = 5
-            Btn.Parent           = Page
-            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 7)
+            Btn.ZIndex           = 6
+            Btn.Parent           = Row
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
             local Stroke = Instance.new("UIStroke", Btn)
             Stroke.Thickness = 1
@@ -808,12 +818,12 @@ function DaleyUI:CreateWindow(config)
                 TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(30,30,40)}):Play()
             end)
             Btn.MouseLeave:Connect(function()
-                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(20,20,26)}):Play()
+                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25,25,32)}):Play()
             end)
             Btn.MouseButton1Click:Connect(function()
                 TweenService:Create(Btn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(180,40,40)}):Play()
                 task.wait(0.12)
-                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(20,20,26)}):Play()
+                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25,25,32)}):Play()
                 callback()
             end)
         end
@@ -823,20 +833,29 @@ function DaleyUI:CreateWindow(config)
             local placeholder = config.Name        or config.PlaceholderText or "Enter text..."
             local callback    = config.Callback    or function() end
 
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 38)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
             local TB = Instance.new("TextBox")
-            TB.Size               = UDim2.new(1, 0, 0, 36)
+            TB.Size               = UDim2.new(0, 138, 0, 26)
+            TB.Position           = UDim2.new(1, -148, 0.5, -13)
             TB.BackgroundColor3   = Color3.fromRGB(14, 14, 18)
             TB.PlaceholderText    = placeholder
             TB.Text               = ""
             TB.TextColor3         = Color3.fromRGB(255, 255, 255)
             TB.PlaceholderColor3  = Color3.fromRGB(90, 90, 98)
-            TB.TextSize           = 12
+            TB.TextSize           = 11
             TB.Font               = Enum.Font.GothamMedium
             TB.BorderSizePixel    = 0
             TB.ClearTextOnFocus   = false
-            TB.ZIndex             = 5
-            TB.Parent             = Page
-            Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 7)
+            TB.ZIndex             = 6
+            TB.Parent             = Row
+            Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 6)
 
             local Stroke = Instance.new("UIStroke", TB)
             Stroke.Thickness = 1
