@@ -259,7 +259,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = false
     end)
 
-    -- Drag System
+    -- Drag System with Safety Left-Click Hold Check
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -268,15 +268,24 @@ function DaleyUI:CreateWindow(config)
             startPos  = WindowFrame.Position
         end
     end)
+    
     UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = i.Position - dragStart
-            WindowFrame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
+        if dragging then
+            -- Failsafe: check if Left-Click is actually pressed. If not, instantly kill state.
+            if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                dragging = false
+                return
+            end
+            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = i.Position - dragStart
+                WindowFrame.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
         end
     end)
+    
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
@@ -367,7 +376,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Parent                 = WindowFrame
 
     -- =========================================================================
-    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (NO MORE STICKING) ]] --
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF METHOD) ]] --
     -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
@@ -405,23 +414,32 @@ function DaleyUI:CreateWindow(config)
         end)
     end
 
-    -- Global Input listener safely handles release even if mouse drifts outside bounds
+    -- Global Input listener with active held verification checks
     UserInputService.InputChanged:Connect(function(i)
-        if activeResize and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = i.Position - resizeStartMouse
+        if activeResize then
+            -- ULTIMATE FAILSAFE: If the user is physically not pressing left-click down, kill the resize instantly.
+            if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                activeResize = false
+                activeCorner = nil
+                return
+            end
             
-            local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
-            local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
-            
-            local changeX = newWidth - resizeStartSize.X.Offset
-            local changeY = newHeight - resizeStartSize.Y.Offset
-            
-            local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
-            local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
+            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = i.Position - resizeStartMouse
+                
+                local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
+                local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
+                
+                local changeX = newWidth - resizeStartSize.X.Offset
+                local changeY = newHeight - resizeStartSize.Y.Offset
+                
+                local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
+                local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
 
-            WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
-            WindowFrame.Position = UDim2.new(resizeStartPos.X.Scale, posX, resizeStartPos.Y.Scale, posY)
-            originalSize = WindowFrame.Size
+                WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+                WindowFrame.Position = UDim2.new(resizeStartPos.X.Scale, posX, resizeStartPos.Y.Scale, posY)
+                originalSize = WindowFrame.Size
+            end
         end
     end)
 
