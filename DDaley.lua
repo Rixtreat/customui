@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - MULTI-CORNER RESIZE & DISC FIX ]] --
+-- [[ DALEY UI LIBRARY - ALL 4 CORNERS RESIZE, FIXES, & UI SETTINGS ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
@@ -19,6 +19,14 @@ local TargetParent = (gethui and gethui()) or CoreGui or LP:WaitForChild("Player
 -- =========================================================================
 local DaleyUI = {}
 DaleyUI.__index = DaleyUI
+
+-- Global Settings Reference (Shared between Library, Windows, and UI Settings)
+local UISettings = {
+    RGBOutline = true,
+    OutlineColor = Color3.fromRGB(255, 50, 50),
+    ToggleKey = Enum.KeyCode.K,
+    StarsEnabled = true
+}
 
 -- =========================================================================
 -- [[ CREATE WINDOW ]] --
@@ -55,17 +63,22 @@ function DaleyUI:CreateWindow(config)
     WindowFrame.Parent           = ScreenGui
     Instance.new("UICorner", WindowFrame).CornerRadius = UDim.new(0, 12)
 
-    -- RGB Border
+    -- RGB / Static Outline Border
     local RGBStroke = Instance.new("UIStroke")
     RGBStroke.Thickness       = 2
     RGBStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     RGBStroke.Parent          = WindowFrame
 
+    -- Dynamic Border Loop
     task.spawn(function()
         local hue = 0
         while ScreenGui.Parent do
-            hue = (hue + 1) % 360
-            RGBStroke.Color = Color3.fromHSV(hue / 360, 0.85, 1)
+            if UISettings.RGBOutline then
+                hue = (hue + 1) % 360
+                RGBStroke.Color = Color3.fromHSV(hue / 360, 0.85, 1)
+            else
+                RGBStroke.Color = UISettings.OutlineColor
+            end
             task.wait()
         end
     end)
@@ -95,12 +108,18 @@ function DaleyUI:CreateWindow(config)
 
     RunService.RenderStepped:Connect(function(dt)
         if not ScreenGui.Parent then return end
-        for _, sd in ipairs(stars) do
-            local nx = sd.f.Position.X.Scale - sd.spd * dt
-            if nx < -0.02 then
-                sd.f.Position = UDim2.new(1.02, 0, math.random(), 0)
-            else
-                sd.f.Position = UDim2.new(nx, 0, sd.f.Position.Y.Scale, 0)
+        
+        -- Instantly toggle visual container visibility based on global setting
+        StarContainer.Visible = UISettings.StarsEnabled
+        
+        if UISettings.StarsEnabled then
+            for _, sd in ipairs(stars) do
+                local nx = sd.f.Position.X.Scale - sd.spd * dt
+                if nx < -0.02 then
+                    sd.f.Position = UDim2.new(1.02, 0, math.random(), 0)
+                else
+                    sd.f.Position = UDim2.new(nx, 0, sd.f.Position.Y.Scale, 0)
+                end
             end
         end
     end)
@@ -123,6 +142,18 @@ function DaleyUI:CreateWindow(config)
     Logo.Font                   = Enum.Font.LuckiestGuy
     Logo.ZIndex                 = 11
     Logo.Parent                 = Header
+
+    -- Dynamically match the Logo color to your outline theme color
+    task.spawn(function()
+        while ScreenGui.Parent do
+            if UISettings.RGBOutline then
+                Logo.TextColor3 = RGBStroke.Color
+            else
+                Logo.TextColor3 = UISettings.OutlineColor
+            end
+            task.wait(0.1)
+        end
+    end)
 
     local TitleLbl = Instance.new("TextLabel")
     TitleLbl.Size                   = UDim2.new(0, 200, 0, 34)
@@ -204,36 +235,24 @@ function DaleyUI:CreateWindow(config)
     DiscBtn.Parent           = HeaderRight
     Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
 
-    -- =========================================================================
-    -- [[ PERFECTED DISCORD CLIPBOARD & ANIMATION ACTION ]] --
-    -- =========================================================================
+    -- Discord Clipboard
     local discDebounce = false
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
         discDebounce = true
+        DiscBtn.Text = "Copied!"[cite: 1]
+        TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()[cite: 1]
         
-        -- 1. Instantly transition the button visually so you get immediate visual feedback[cite: 1]
-        DiscBtn.Text = "Copied!"
-        TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
-        
-        -- 2. Safely run clipboard methods across ALL executors[cite: 1]
         pcall(function()
-            if setclipboard then 
-                setclipboard(discordLink)
-            elseif toclipboard then 
-                toclipboard(discordLink)
-            elseif writeclipboard then
-                writeclipboard(discordLink)
-            elseif set_clipboard then
-                set_clipboard(discordLink)
-            elseif syn and syn.write_clipboard then
-                syn.write_clipboard(discordLink)
-            elseif fluxus and fluxus.set_clipboard then
-                fluxus.set_clipboard(discordLink)
+            if setclipboard then setclipboard(discordLink)
+            elseif toclipboard then toclipboard(discordLink)
+            elseif writeclipboard then writeclipboard(discordLink)
+            elseif set_clipboard then set_clipboard(discordLink)
+            elseif syn and syn.write_clipboard then syn.write_clipboard(discordLink)
+            elseif fluxus and fluxus.set_clipboard then fluxus.set_clipboard(discordLink)
             end
         end)
         
-        -- 3. Reset after 2 seconds
         task.wait(2)
         DiscBtn.Text = "Join Discord"
         TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
@@ -262,15 +281,13 @@ function DaleyUI:CreateWindow(config)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 
-    -- =========================================================================
-    -- [[ "K" KEYBIND TOGGLE WITH SCALE ANIMATION ]] --
-    -- =========================================================================
+    -- Keybind Toggle with Scale Animation
     local uiVisible = true
     local animating = false
 
     UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
-        if input.KeyCode == Enum.KeyCode.K then
+        if input.KeyCode == UISettings.ToggleKey then
             if animating then return end
             animating = true
             uiVisible = not uiVisible
@@ -350,7 +367,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Parent                 = WindowFrame
 
     -- =========================================================================
-    -- [[ INVISIBLE 4-CORNER RESIZE HANDLERS (NO PLOTS OR IMAGES) ]] --
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (NO MORE STICKING) ]] --
     -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
@@ -366,21 +383,21 @@ function DaleyUI:CreateWindow(config)
     local resizeStartPos = nil
 
     for cornerName, info in pairs(resizeHandles) do
-        -- Changed to TextButton with no text or background to guarantee absolutely no phantom icons
-        local Handle = Instance.new("TextButton")
+        -- Uses completely invisible, transparent 1x1 pixel image ID to avoid Roblox focus locking
+        local Handle = Instance.new("ImageButton")
         Handle.Name                   = cornerName .. "_Resize"
         Handle.Size                   = UDim2.new(0, 16, 0, 16)
         Handle.Position               = info.Pos
         Handle.BackgroundTransparency = 1 
-        Handle.Text                   = "" 
+        Handle.Image                  = "rbxassetid://0"
         Handle.BorderSizePixel        = 0
         Handle.ZIndex                 = 100
         Handle.Parent                 = WindowFrame
 
         Handle.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                activeResize = true
-                activeCorner = info
+                activeResize     = true
+                activeCorner     = info
                 resizeStartMouse = i.Position
                 resizeStartSize  = WindowFrame.Size
                 resizeStartPos   = WindowFrame.Position
@@ -388,15 +405,14 @@ function DaleyUI:CreateWindow(config)
         end)
     end
 
+    -- Global Input listener safely handles release even if mouse drifts outside bounds
     UserInputService.InputChanged:Connect(function(i)
         if activeResize and i.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = i.Position - resizeStartMouse
             
-            -- Size limits
             local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
             local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
             
-            -- Calculate Position shift if resizing from Left or Top edges
             local changeX = newWidth - resizeStartSize.X.Offset
             local changeY = newHeight - resizeStartSize.Y.Offset
             
@@ -410,7 +426,7 @@ function DaleyUI:CreateWindow(config)
     end)
 
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.MouseButton1 then
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
             activeResize = false
             activeCorner = nil
         end
@@ -449,9 +465,19 @@ function DaleyUI:CreateWindow(config)
         Accent.ZIndex                 = 5
         Accent.Parent                 = Btn
 
-        -- =========================================================================
-        -- [[ SCROLLABLE MAIN PAGES ]] --
-        -- =========================================================================
+        -- Maintain aesthetic accent matching
+        task.spawn(function()
+            while ScreenGui.Parent do
+                if UISettings.RGBOutline then
+                    Accent.BackgroundColor3 = RGBStroke.Color
+                else
+                    Accent.BackgroundColor3 = UISettings.OutlineColor
+                end
+                task.wait(0.1)
+            end
+        end)
+
+        -- Scrollable Main Pages
         local Page = Instance.new("ScrollingFrame")
         Page.Name                   = name .. "_Page"
         Page.Size                   = UDim2.new(1, 0, 1, 0)
@@ -479,7 +505,6 @@ function DaleyUI:CreateWindow(config)
         PagePad.PaddingRight  = UDim.new(0, 8)
         PagePad.Parent        = Page
 
-        -- Explicitly recalculates page canvas scroll heights
         PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 25)
         end)
@@ -520,7 +545,7 @@ function DaleyUI:CreateWindow(config)
         end
 
         -- =====================================================================
-        -- Tab Object
+        -- Tab Object Elements
         -- =====================================================================
         local Tab = {}
 
@@ -660,6 +685,7 @@ function DaleyUI:CreateWindow(config)
             Lbl.Font                   = Enum.Font.GothamMedium
             Lbl.TextXAlignment         = Enum.TextXAlignment.Left
             Lbl.ZIndex                 = 6
+            Repli = Row
             Lbl.Parent                 = Row
 
             local ValLbl = Instance.new("TextLabel")
@@ -826,9 +852,6 @@ function DaleyUI:CreateWindow(config)
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
-            -- =========================================================================
-            -- [[ SCROLLABLE DROPDOWN CONTAINER ]] --
-            -- =========================================================================
             local DropFrame = Instance.new("ScrollingFrame")
             DropFrame.Size                   = UDim2.new(1, 0, 0, math.clamp(#list * 28, 0, 140))
             DropFrame.Position               = UDim2.new(0, 0, 1, 3)
@@ -882,32 +905,26 @@ function DaleyUI:CreateWindow(config)
                 end)
             end
 
-            -- Build initial items
             for _, item in ipairs(list) do
                 createOptionButton(item)
             end
 
-            -- Return the dropdown API object
             return {
                 Get = function() 
                     return SelBtn.Text 
                 end,
                 Refresh = function(self, newList)
                     newList = newList or {}
-                    
                     for _, child in ipairs(DropFrame:GetChildren()) do
                         if child:IsA("TextButton") then
                             child:Destroy()
                         end
                     end
-                    
                     DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(#newList * 28, 0, 140))
                     DropFrame.CanvasSize = UDim2.new(0, 0, 0, #newList * 28)
-                    
                     for _, item in ipairs(newList) do
                         createOptionButton(item)
                     end
-                    
                     local found = false
                     for _, item in ipairs(newList) do
                         if item == SelBtn.Text then
@@ -924,6 +941,84 @@ function DaleyUI:CreateWindow(config)
 
         return Tab
     end
+
+    -- =========================================================================
+    -- [[ AUTOMATIC UI SETTINGS TAB GENERATION ]] --
+    -- =========================================================================
+    local SettingsTab = Window:CreateTab("UI Settings")
+    SettingsTab:CreateSection("Customization Settings")
+
+    -- Toggle RGB Outline
+    SettingsTab:CreateToggle({
+        Name = "RGB Outline Theme",
+        Default = UISettings.RGBOutline,
+        Callback = function(v)
+            UISettings.RGBOutline = v
+        end
+    })
+
+    -- Background Stars Toggle
+    SettingsTab:CreateToggle({
+        Name = "Background Starfield",
+        Default = UISettings.StarsEnabled,
+        Callback = function(v)
+            UISettings.StarsEnabled = v
+        end
+    })
+
+    -- Setup Preset Outline Palette Picker
+    local ColorMap = {
+        Red    = Color3.fromRGB(255, 50, 50),
+        Orange = Color3.fromRGB(255, 140, 0),
+        Yellow = Color3.fromRGB(255, 215, 0),
+        Green  = Color3.fromRGB(50, 205, 50),
+        Blue   = Color3.fromRGB(50, 150, 255),
+        Purple = Color3.fromRGB(138, 43, 226),
+        Pink   = Color3.fromRGB(255, 105, 180),
+        Black  = Color3.fromRGB(25, 25, 25),
+        White  = Color3.fromRGB(255, 255, 255)
+    }
+
+    local presets = {"Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Black", "White"}
+    SettingsTab:CreateDropdown({
+        Name = "Theme Outline Color",
+        Options = presets,
+        Callback = function(selectedName)
+            if ColorMap[selectedName] then
+                UISettings.OutlineColor = ColorMap[selectedName]
+            end
+        end
+    })
+
+    -- Custom RGB Color Picker Input
+    SettingsTab:CreateTextBox({
+        Name = "Custom Theme RGB (e.g. 255,0,0)",
+        Callback = function(inputStr)
+            local r, g, b = inputStr:match("(%d+),%s*(%d+),%s*(%d+)")
+            if r and g and b then
+                local RVal = math.clamp(tonumber(r), 0, 255)
+                local GVal = math.clamp(tonumber(g), 0, 255)
+                local BVal = math.clamp(tonumber(b), 0, 255)
+                UISettings.OutlineColor = Color3.fromRGB(RVal, GVal, BVal)
+            end
+        end
+    })
+
+    SettingsTab:CreateSection("Control Controls")
+
+    -- Keybind Change Configuration Box
+    SettingsTab:CreateTextBox({
+        Name = "Change UI Toggle Key (e.g. K, P, L)",
+        Callback = function(val)
+            local targetKey = string.upper(val:sub(1,1))
+            pcall(function()
+                local newCode = Enum.KeyCode[targetKey]
+                if newCode then
+                    UISettings.ToggleKey = newCode
+                end
+            end)
+        end
+    })
 
     return Window
 end
