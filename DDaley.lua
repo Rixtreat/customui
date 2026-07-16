@@ -1,8 +1,8 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - FINAL UPDATED ]] --
+-- [[ DALEY UI LIBRARY - FULL FIXED VERSION ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
---   local Window = DaleyUI:CreateWindow({ Name = "My Hub" })
+--   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
 -- =========================================================================
 
 local Players          = game:GetService("Players")
@@ -47,7 +47,7 @@ function DaleyUI:CreateWindow(config)
     WindowFrame.Position         = UDim2.new(0.5, -325, 0.5, -210)
     WindowFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
     WindowFrame.BorderSizePixel  = 0
-    WindowFrame.ClipsDescendants = true
+    WindowFrame.ClipsDescendants = false -- False so dropdown panels aren't cut off
     WindowFrame.Active           = true
     WindowFrame.Parent           = ScreenGui
     Instance.new("UICorner", WindowFrame).CornerRadius = UDim.new(0, 12)
@@ -72,7 +72,9 @@ function DaleyUI:CreateWindow(config)
     StarContainer.Size                   = UDim2.new(1, 0, 1, 0)
     StarContainer.BackgroundTransparency = 1
     StarContainer.ZIndex                 = 1
+    StarContainer.ClipsDescendants       = true
     StarContainer.Parent                 = WindowFrame
+    Instance.new("UICorner", StarContainer).CornerRadius = UDim.new(0, 12)
 
     local stars = {}
     for i = 1, 70 do
@@ -199,14 +201,34 @@ function DaleyUI:CreateWindow(config)
     DiscBtn.Parent           = HeaderRight
     Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
 
+    -- =========================================================================
+    -- [[ FIXED DISCORD CLIPBOARD & ANIMATION ACTION ]] --
+    -- =========================================================================
     local discDebounce = false
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
         discDebounce = true
-        if setclipboard then setclipboard(discordLink)
-        elseif toclipboard then toclipboard(discordLink) end
+        
+        -- Fallback link assignment
+        local linkToCopy = tostring(discordLink or config.Discord or "https://discord.gg/SeNPuUVsZQ")
+        
+        -- Instantly change text and apply green color tween first to guarantee feedback[cite: 1]
         DiscBtn.Text = "Copied!"
         TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
+        
+        -- Safely try different executor clipboard environments without crashing[cite: 1]
+        pcall(function()
+            if setclipboard then 
+                setclipboard(linkToCopy)
+            elseif toclipboard then 
+                toclipboard(linkToCopy)
+            elseif writeclipboard then
+                writeclipboard(linkToCopy)
+            elseif set_clipboard then
+                set_clipboard(linkToCopy)
+            end
+        end)
+        
         task.wait(2)
         DiscBtn.Text = "Join Discord"
         TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
@@ -249,9 +271,7 @@ function DaleyUI:CreateWindow(config)
             uiVisible = not uiVisible
 
             if uiVisible then
-                -- Open Animation
                 WindowFrame.Visible = true
-                WindowFrame.ClipsDescendants = true
                 TweenService:Create(WindowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
                     Size = originalSize
                 }):Play()
@@ -260,12 +280,9 @@ function DaleyUI:CreateWindow(config)
                 })
                 t:Play()
                 t.Completed:Wait()
-                WindowFrame.ClipsDescendants = false
                 animating = false
             else
-                -- Close Animation
-                originalSize = WindowFrame.Size -- capture current size (accounts for resizing)
-                WindowFrame.ClipsDescendants = true
+                originalSize = WindowFrame.Size
                 TweenService:Create(WindowFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                     Size = UDim2.new(0, 0, 0, 0)
                 }):Play()
@@ -289,7 +306,7 @@ function DaleyUI:CreateWindow(config)
     Divider.ZIndex           = 5
     Divider.Parent           = WindowFrame
 
-    -- Sidebar (Fitted with dynamic width/height sizing)
+    -- Sidebar
     local Sidebar = Instance.new("Frame")
     Sidebar.Size             = UDim2.new(0, 158, 1, -46)
     Sidebar.Position         = UDim2.new(0, 0, 0, 46)
@@ -334,7 +351,7 @@ function DaleyUI:CreateWindow(config)
     ResizeHandle.Size                   = UDim2.new(0, 16, 0, 16)
     ResizeHandle.Position               = UDim2.new(1, -16, 1, -16)
     ResizeHandle.BackgroundTransparency = 1
-    ResizeHandle.Image                  = "rbxassetid://1234567" -- invisible hit container
+    ResizeHandle.Image                  = "rbxassetid://1234567"
     ResizeHandle.ZIndex                 = 100
     ResizeHandle.Parent                 = WindowFrame
 
@@ -353,7 +370,7 @@ function DaleyUI:CreateWindow(config)
     UserInputService.InputChanged:Connect(function(i)
         if resizing and i.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = i.Position - resizeStart
-            local newWidth = math.clamp(startSize.X.Offset + delta.X, 480, 950) -- min/max limits
+            local newWidth = math.clamp(startSize.X.Offset + delta.X, 480, 950)
             local newHeight = math.clamp(startSize.Y.Offset + delta.Y, 280, 650)
             WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
             originalSize = WindowFrame.Size
@@ -369,7 +386,7 @@ function DaleyUI:CreateWindow(config)
     local activeTabBtn = nil
 
     -- =====================================================================
-    -- Window Object (returned to user)
+    -- Window Object
     -- =====================================================================
     local Window = {}
 
@@ -399,18 +416,22 @@ function DaleyUI:CreateWindow(config)
         Accent.ZIndex                 = 5
         Accent.Parent                 = Btn
 
-        -- Page
+        -- =========================================================================
+        -- [[ SCROLLABLE MAIN PAGES ]] --
+        -- =========================================================================
         local Page = Instance.new("ScrollingFrame")
         Page.Name                   = name .. "_Page"
         Page.Size                   = UDim2.new(1, 0, 1, 0)
         Page.BackgroundTransparency = 1
         Page.BorderSizePixel        = 0
         Page.Visible                = false
-        Page.ScrollBarThickness     = 3
+        Page.ScrollBarThickness     = 4
         Page.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
+        Page.ZIndex                 = 4
+        Page.Active                 = true
+        Page.ScrollingDirection     = Enum.ScrollingDirection.Y
         Page.CanvasSize             = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize    = Enum.AutomaticSize.Y
-        Page.ZIndex                 = 4
         Page.Parent                 = PageContainer
 
         local PageLayout = Instance.new("UIListLayout")
@@ -420,10 +441,15 @@ function DaleyUI:CreateWindow(config)
 
         local PagePad = Instance.new("UIPadding")
         PagePad.PaddingTop    = UDim.new(0, 7)
-        PagePad.PaddingBottom = UDim.new(0, 10)
-        PagePad.PaddingLeft   = UDim.new(0, 2)
-        PagePad.PaddingRight  = UDim.new(0, 5)
+        PagePad.PaddingBottom = UDim.new(0, 15)
+        PagePad.PaddingLeft   = UDim.new(0, 4)
+        PagePad.PaddingRight  = UDim.new(0, 8)
         PagePad.Parent        = Page
+
+        -- Explicitly recalculates page canvas scroll heights
+        PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 25)
+        end)
 
         -- Tab click logic
         Btn.MouseButton1Click:Connect(function()
@@ -452,7 +478,6 @@ function DaleyUI:CreateWindow(config)
             TweenService:Create(Accent, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
         end)
 
-        -- Auto-select first tab
         if not activeTabBtn then
             activeTabBtn = Btn
             Page.Visible = true
@@ -462,7 +487,7 @@ function DaleyUI:CreateWindow(config)
         end
 
         -- =====================================================================
-        -- Tab Object (returned to user)
+        -- Tab Object
         -- =====================================================================
         local Tab = {}
 
@@ -738,7 +763,7 @@ function DaleyUI:CreateWindow(config)
             Wrapper.Size             = UDim2.new(1, 0, 0, 38)
             Wrapper.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
             Wrapper.BorderSizePixel  = 0
-            Wrapper.ZIndex           = 5
+            Wrapper.ZIndex           = 15
             Wrapper.ClipsDescendants = false
             Wrapper.Parent           = Page
             Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 7)
@@ -752,7 +777,7 @@ function DaleyUI:CreateWindow(config)
             Lbl.TextSize               = 12
             Lbl.Font                   = Enum.Font.GothamMedium
             Lbl.TextXAlignment         = Enum.TextXAlignment.Left
-            Lbl.ZIndex                 = 6
+            Lbl.ZIndex                 = 16
             Lbl.Parent                 = Wrapper
 
             local SelBtn = Instance.new("TextButton")
@@ -764,12 +789,12 @@ function DaleyUI:CreateWindow(config)
             SelBtn.TextSize         = 11
             SelBtn.Font             = Enum.Font.GothamBold
             SelBtn.BorderSizePixel  = 0
-            SelBtn.ZIndex           = 7
+            SelBtn.ZIndex           = 17
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
             -- =========================================================================
-            -- [[ SCROLLABLE DROPDOWN CONTAINER ]][cite: 1]
+            -- [[ SCROLLABLE DROPDOWN CONTAINER ]] --
             -- =========================================================================
             local DropFrame = Instance.new("ScrollingFrame")
             DropFrame.Size                   = UDim2.new(1, 0, 0, math.clamp(#list * 28, 0, 140))
@@ -777,9 +802,11 @@ function DaleyUI:CreateWindow(config)
             DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
             DropFrame.BorderSizePixel        = 0
             DropFrame.Visible                = false
-            DropFrame.ZIndex                 = 20
+            DropFrame.ZIndex                 = 50
             DropFrame.ScrollBarThickness     = 3
             DropFrame.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
+            DropFrame.ScrollingDirection     = Enum.ScrollingDirection.Y
+            DropFrame.Active                 = true
             DropFrame.CanvasSize             = UDim2.new(0, 0, 0, #list * 28)
             DropFrame.Parent                 = Wrapper
             Instance.new("UICorner", DropFrame).CornerRadius = UDim.new(0, 6)
@@ -788,7 +815,8 @@ function DaleyUI:CreateWindow(config)
             DStroke.Thickness = 1
             DStroke.Color     = Color3.fromRGB(40, 40, 50)
 
-            Instance.new("UIListLayout", DropFrame).SortOrder = Enum.SortOrder.LayoutOrder
+            local DropLayout = Instance.new("UIListLayout", DropFrame)
+            DropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
             local open = false
             SelBtn.MouseButton1Click:Connect(function()
@@ -796,16 +824,15 @@ function DaleyUI:CreateWindow(config)
                 DropFrame.Visible = open
             end)
 
-            -- Helper function to generate item buttons
             local function createOptionButton(item)
                 local Opt = Instance.new("TextButton")
-                Opt.Size                   = UDim2.new(1, -5, 0, 28) -- Leave offset spacing for red scrollbar
+                Opt.Size                   = UDim2.new(1, -6, 0, 28)
                 Opt.BackgroundTransparency = 1
                 Opt.Text                   = item
                 Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
                 Opt.TextSize               = 11
                 Opt.Font                   = Enum.Font.GothamMedium
-                Opt.ZIndex                 = 21
+                Opt.ZIndex                 = 51
                 Opt.Parent                 = DropFrame
 
                 Opt.MouseEnter:Connect(function()
@@ -832,27 +859,22 @@ function DaleyUI:CreateWindow(config)
                 Get = function() 
                     return SelBtn.Text 
                 end,
-                -- Newly added Refresh function to dynamically swap lists on the fly![cite: 1]
                 Refresh = function(self, newList)
                     newList = newList or {}
                     
-                    -- Clear old text option elements
                     for _, child in ipairs(DropFrame:GetChildren()) do
                         if child:IsA("TextButton") then
                             child:Destroy()
                         end
                     end
                     
-                    -- Resize dropdown visual container and canvas heights dynamically[cite: 1]
                     DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(#newList * 28, 0, 140))
                     DropFrame.CanvasSize = UDim2.new(0, 0, 0, #newList * 28)
                     
-                    -- Generate new option list buttons
                     for _, item in ipairs(newList) do
                         createOptionButton(item)
                     end
                     
-                    -- Fallback text check
                     local found = false
                     for _, item in ipairs(newList) do
                         if item == SelBtn.Text then
