@@ -12,7 +12,26 @@ local RunService       = game:GetService("RunService")
 local CoreGui          = game:GetService("CoreGui")
 
 local LP = Players.LocalPlayer
-local TargetParent = (gethui and gethui()) or CoreGui or LP:WaitForChild("PlayerGui")
+
+-- SAFE TO USE UI PARENT (Completely avoids the nil gethui call error)
+local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
+
+-- =========================================================================
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
+-- =========================================================================
+local isLeftMouseDown = false
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = false
+    end
+end)
 
 -- =========================================================================
 -- [[ LIBRARY OBJECT ]] --
@@ -240,8 +259,8 @@ function DaleyUI:CreateWindow(config)
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
         discDebounce = true
-        DiscBtn.Text = "Copied!"[cite: 1]
-        TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()[cite: 1]
+        DiscBtn.Text = "Copied!"
+        TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
         
         pcall(function()
             if setclipboard then setclipboard(discordLink)
@@ -259,7 +278,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = false
     end)
 
-    -- Drag System with Safety Left-Click Hold Check
+    -- Drag System with Custom State Safeguard
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -271,8 +290,8 @@ function DaleyUI:CreateWindow(config)
     
     UserInputService.InputChanged:Connect(function(i)
         if dragging then
-            -- Failsafe: check if Left-Click is actually pressed. If not, instantly kill state.
-            if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            -- Fallback verification using custom state tracker (Fixes sticking)
+            if not isLeftMouseDown then
                 dragging = false
                 return
             end
@@ -376,7 +395,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Parent                 = WindowFrame
 
     -- =========================================================================
-    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF METHOD) ]] --
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF) ]] --
     -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
@@ -392,7 +411,7 @@ function DaleyUI:CreateWindow(config)
     local resizeStartPos = nil
 
     for cornerName, info in pairs(resizeHandles) do
-        -- Uses completely invisible, transparent 1x1 pixel image ID to avoid Roblox focus locking
+        -- Transparent 1x1 asset resolves standard engine-level drag-locking
         local Handle = Instance.new("ImageButton")
         Handle.Name                   = cornerName .. "_Resize"
         Handle.Size                   = UDim2.new(0, 16, 0, 16)
@@ -414,11 +433,11 @@ function DaleyUI:CreateWindow(config)
         end)
     end
 
-    -- Global Input listener with active held verification checks
+    -- InputChanged Handler checking custom safety state
     UserInputService.InputChanged:Connect(function(i)
         if activeResize then
-            -- ULTIMATE FAILSAFE: If the user is physically not pressing left-click down, kill the resize instantly.
-            if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            -- Fallback verification using custom state tracker (Stops resizing instantly if mouse released)
+            if not isLeftMouseDown then
                 activeResize = false
                 activeCorner = nil
                 return
@@ -703,7 +722,6 @@ function DaleyUI:CreateWindow(config)
             Lbl.Font                   = Enum.Font.GothamMedium
             Lbl.TextXAlignment         = Enum.TextXAlignment.Left
             Lbl.ZIndex                 = 6
-            Repli = Row
             Lbl.Parent                 = Row
 
             local ValLbl = Instance.new("TextLabel")
