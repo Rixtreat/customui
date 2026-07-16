@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - FULL FIXED VERSION ]] --
+-- [[ DALEY UI LIBRARY - MULTI-CORNER RESIZE & DISC FIX ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
@@ -26,7 +26,10 @@ DaleyUI.__index = DaleyUI
 function DaleyUI:CreateWindow(config)
     config = config or {}
     local windowName  = config.Name     or "Daley Hub"
-    local discordLink = config.Discord  or "https://discord.gg/SeNPuUVsZQ"
+    
+    -- Force-resolve a strict string fallback immediately so clipboard never fails
+    local rawDiscord = config.Discord or config.discord or "https://discord.gg/SeNPuUVsZQ"
+    local discordLink = tostring(rawDiscord)
 
     -- Cleanup existing
     if TargetParent:FindFirstChild("DaleyStarfieldUI") then
@@ -47,7 +50,7 @@ function DaleyUI:CreateWindow(config)
     WindowFrame.Position         = UDim2.new(0.5, -325, 0.5, -210)
     WindowFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
     WindowFrame.BorderSizePixel  = 0
-    WindowFrame.ClipsDescendants = false -- False so dropdown panels aren't cut off
+    WindowFrame.ClipsDescendants = false
     WindowFrame.Active           = true
     WindowFrame.Parent           = ScreenGui
     Instance.new("UICorner", WindowFrame).CornerRadius = UDim.new(0, 12)
@@ -174,10 +177,10 @@ function DaleyUI:CreateWindow(config)
     MinBtn.BackgroundTransparency = 1
     MinBtn.Text                   = "—"
     MinBtn.TextColor3             = Color3.fromRGB(170, 170, 175)
-    MinBtn.TextSize               = 14
-    MinBtn.Font                   = Enum.Font.GothamMedium
-    MinBtn.ZIndex                 = 12
-    MinBtn.Parent                 = CtrlFrame
+    MinBtn.TextSize         = 14
+    MinBtn.Font             = Enum.Font.GothamMedium
+    MinBtn.ZIndex           = 12
+    MinBtn.Parent           = CtrlFrame
 
     local minimized    = false
     local originalSize = WindowFrame.Size
@@ -202,33 +205,35 @@ function DaleyUI:CreateWindow(config)
     Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
 
     -- =========================================================================
-    -- [[ FIXED DISCORD CLIPBOARD & ANIMATION ACTION ]] --
+    -- [[ PERFECTED DISCORD CLIPBOARD & ANIMATION ACTION ]] --
     -- =========================================================================
     local discDebounce = false
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
         discDebounce = true
         
-        -- Fallback link assignment
-        local linkToCopy = tostring(discordLink or config.Discord or "https://discord.gg/SeNPuUVsZQ")
-        
-        -- Instantly change text and apply green color tween first to guarantee feedback[cite: 1]
+        -- 1. Instantly transition the button visually so you get immediate visual feedback[cite: 1]
         DiscBtn.Text = "Copied!"
         TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
         
-        -- Safely try different executor clipboard environments without crashing[cite: 1]
+        -- 2. Safely run clipboard methods across ALL executors[cite: 1]
         pcall(function()
             if setclipboard then 
-                setclipboard(linkToCopy)
+                setclipboard(discordLink)
             elseif toclipboard then 
-                toclipboard(linkToCopy)
+                toclipboard(discordLink)
             elseif writeclipboard then
-                writeclipboard(linkToCopy)
+                writeclipboard(discordLink)
             elseif set_clipboard then
-                set_clipboard(linkToCopy)
+                set_clipboard(discordLink)
+            elseif syn and syn.write_clipboard then
+                syn.write_clipboard(discordLink)
+            elseif fluxus and fluxus.set_clipboard then
+                fluxus.set_clipboard(discordLink)
             end
         end)
         
+        -- 3. Reset after 2 seconds
         task.wait(2)
         DiscBtn.Text = "Join Discord"
         TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
@@ -345,41 +350,67 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Parent                 = WindowFrame
 
     -- =========================================================================
-    -- [[ MOUSE RESIZE SYSTEM ]] --
+    -- [[ INVISIBLE 4-CORNER RESIZE HANDLERS (NO ICONS) ]] --
     -- =========================================================================
-    local ResizeHandle = Instance.new("ImageButton")
-    ResizeHandle.Size                   = UDim2.new(0, 16, 0, 16)
-    ResizeHandle.Position               = UDim2.new(1, -16, 1, -16)
-    ResizeHandle.BackgroundTransparency = 1
-    ResizeHandle.Image                  = "rbxassetid://1234567"
-    ResizeHandle.ZIndex                 = 100
-    ResizeHandle.Parent                 = WindowFrame
+    local resizeHandles = {
+        BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
+        BL = { Pos = UDim2.new(0, 0, 1, -16),   Anchor = Vector2.new(0,0), FactorX = -1, FactorY = 1,  MoveX = 1, MoveY = 0 },
+        TR = { Pos = UDim2.new(1, -16, 0, 0),   Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = -1, MoveX = 0, MoveY = 1 },
+        TL = { Pos = UDim2.new(0, 0, 0, 0),     Anchor = Vector2.new(0,0), FactorX = -1, FactorY = -1, MoveX = 1, MoveY = 1 }
+    }
 
-    local resizing = false
-    local resizeStart = nil
-    local startSize = nil
+    local activeResize = false
+    local activeCorner = nil
+    local resizeStartMouse = nil
+    local resizeStartSize = nil
+    local resizeStartPos = nil
 
-    ResizeHandle.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            resizing = true
-            resizeStart = i.Position
-            startSize = WindowFrame.Size
-        end
-    end)
+    for cornerName, info in pairs(resizeHandles) do
+        local Handle = Instance.new("ImageButton")
+        Handle.Name                   = cornerName .. "_Resize"
+        Handle.Size                   = UDim2.new(0, 16, 0, 16)
+        Handle.Position               = info.Pos
+        Handle.BackgroundTransparency = 1 -- Invisible resize point
+        Handle.Image                  = "" -- No icon
+        Handle.ZIndex                 = 100
+        Handle.Parent                 = WindowFrame
+
+        Handle.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                activeResize = true
+                activeCorner = info
+                resizeStartMouse = i.Position
+                resizeStartSize  = WindowFrame.Size
+                resizeStartPos   = WindowFrame.Position
+            end
+        end)
+    end
 
     UserInputService.InputChanged:Connect(function(i)
-        if resizing and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = i.Position - resizeStart
-            local newWidth = math.clamp(startSize.X.Offset + delta.X, 480, 950)
-            local newHeight = math.clamp(startSize.Y.Offset + delta.Y, 280, 650)
+        if activeResize and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = i.Position - resizeStartMouse
+            
+            -- Size limits
+            local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
+            local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
+            
+            -- Calculate Position shift if resizing from Left or Top edges
+            local changeX = newWidth - resizeStartSize.X.Offset
+            local changeY = newHeight - resizeStartSize.Y.Offset
+            
+            local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
+            local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
+
             WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+            WindowFrame.Position = UDim2.new(resizeStartPos.X.Scale, posX, resizeStartPos.Y.Scale, posY)
             originalSize = WindowFrame.Size
         end
     end)
 
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            resizing = false
+            activeResize = false
+            activeCorner = nil
         end
     end)
 
