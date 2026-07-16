@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED MISC TAB ]] --
+-- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED UI SETTINGS TAB ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
@@ -469,13 +469,16 @@ function DaleyUI:CreateWindow(config)
     end)
 
     local activeTabBtn = nil
+    local tabCount = 0 -- Keeps track of custom tab creation order
 
     -- =====================================================================
     -- Window Object
     -- =====================================================================
     local Window = {}
 
-    function Window:CreateTab(name)
+    function Window:CreateTab(name, layoutOrder)
+        tabCount = tabCount + 1
+
         -- Sidebar Button
         local Btn = Instance.new("TextButton")
         Btn.Name                   = name .. "_Tab"
@@ -489,6 +492,7 @@ function DaleyUI:CreateWindow(config)
         Btn.Font                   = Enum.Font.GothamMedium
         Btn.TextXAlignment         = Enum.TextXAlignment.Left
         Btn.ZIndex                 = 4
+        Btn.LayoutOrder            = layoutOrder or tabCount -- Custom layout override
         Btn.Parent                 = TabContainer
         Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -1156,9 +1160,10 @@ function DaleyUI:CreateWindow(config)
     end
 
     -- =========================================================================
-    -- [[ AUTOMATIC COMBINED "MISC" TAB GENERATION ]] --
+    -- [[ AUTOMATIC COMBINED "UI Settings" TAB GENERATION ]] --
+    -- Layout Priority = 9999 ensures this is always at the absolute bottom.
     -- =========================================================================
-    local MiscTab = Window:CreateTab("Misc")
+    local MiscTab = Window:CreateTab("UI Settings", 9999)
 
     -- Customization Settings Section
     MiscTab:CreateSection("Customization Settings")
