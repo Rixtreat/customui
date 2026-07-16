@@ -1,31 +1,59 @@
 -- =========================================================================
--- [[ 1. FULL DALEY UI LIBRARY SOURCE CODE (FIXED) ]] --
+-- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED MISC TAB ]] --
+-- Host this file on GitHub and load it via:
+--   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
+--   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
 -- =========================================================================
 
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local RunService       = game:GetService("RunService")
-local CoreGui          = game:GetService("CoreGui")
 
+-- SAFE LOCAL PLAYER ACQUISITION (Fixes Line 13 Nil Errors)
 local LP = Players.LocalPlayer
-local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
+if not LP and RunService:IsClient() then
+    LP = Players:GetPropertyChangedSignal("LocalPlayer"):Wait() or Players.LocalPlayer
+end
 
+-- STUDIO SAFE CORE-GUI FALLBACK
+local CoreGui = game:GetService("CoreGui")
+local TargetParent
+pcall(function()
+    -- This safely attempts to use CoreGui, but falls back to PlayerGui in Studio
+    TargetParent = CoreGui
+end)
+if not TargetParent then
+    TargetParent = LP and LP:WaitForChild("PlayerGui")
+end
+
+-- =========================================================================
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXES LINE 31 NIL ERRORS) ]] --
+-- =========================================================================
 local isLeftMouseDown = false
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    -- Added safety check "if input and ..." to prevent indexing nil errors
+    if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = true
     end
 end)
+
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    -- Added safety check "if input and ..." to prevent indexing nil errors
+    if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = false
     end
 end)
 
+-- =========================================================================
+-- [[ LIBRARY OBJECT ]] --
+-- =========================================================================
 local DaleyUI = {}
 DaleyUI.__index = DaleyUI
 
+-- Global Settings Reference (Shared between Library, Windows, and UI Settings)
 local UISettings = {
     RGBOutline = true,
     OutlineColor = Color3.fromRGB(255, 50, 50),
@@ -33,22 +61,32 @@ local UISettings = {
     StarsEnabled = true
 }
 
+-- =========================================================================
+-- [[ CREATE WINDOW ]] --
+-- =========================================================================
 function DaleyUI:CreateWindow(config)
     config = config or {}
     local windowName  = config.Name     or "Daley Hub"
+    
+    -- Force-resolve a strict string fallback immediately so clipboard never fails
     local rawDiscord = config.Discord or config.discord or "https://discord.gg/SeNPuUVsZQ"
     local discordLink = tostring(rawDiscord)
 
-    if TargetParent:FindFirstChild("DaleyStarfieldUI") then
+    -- Cleanup existing
+    if TargetParent and TargetParent:FindFirstChild("DaleyStarfieldUI") then
         TargetParent.DaleyStarfieldUI:Destroy()
     end
 
+    -- ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name           = "DaleyStarfieldUI"
     ScreenGui.ResetOnSpawn   = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent         = TargetParent
+    if TargetParent then
+        ScreenGui.Parent     = TargetParent
+    end
 
+    -- Main Window Frame
     local WindowFrame = Instance.new("Frame")
     WindowFrame.Name             = "MainWindow"
     WindowFrame.Size             = UDim2.new(0, 650, 0, 420)
@@ -60,11 +98,13 @@ function DaleyUI:CreateWindow(config)
     WindowFrame.Parent           = ScreenGui
     Instance.new("UICorner", WindowFrame).CornerRadius = UDim.new(0, 12)
 
+    -- RGB / Static Outline Border
     local RGBStroke = Instance.new("UIStroke")
     RGBStroke.Thickness       = 2
     RGBStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     RGBStroke.Parent          = WindowFrame
 
+    -- Dynamic Border Loop
     task.spawn(function()
         local hue = 0
         while ScreenGui.Parent do
@@ -78,6 +118,7 @@ function DaleyUI:CreateWindow(config)
         end
     end)
 
+    -- Starfield Star Container
     local StarContainer = Instance.new("Frame")
     StarContainer.Size                   = UDim2.new(1, 0, 1, 0)
     StarContainer.BackgroundTransparency = 1
@@ -102,7 +143,10 @@ function DaleyUI:CreateWindow(config)
 
     RunService.RenderStepped:Connect(function(dt)
         if not ScreenGui.Parent then return end
+        
+        -- Instantly toggle visual container visibility based on global setting
         StarContainer.Visible = UISettings.StarsEnabled
+        
         if UISettings.StarsEnabled then
             for _, sd in ipairs(stars) do
                 local nx = sd.f.Position.X.Scale - sd.spd * dt
@@ -115,6 +159,7 @@ function DaleyUI:CreateWindow(config)
         end
     end)
 
+    -- Header
     local Header = Instance.new("Frame")
     Header.Size                   = UDim2.new(1, 0, 0, 46)
     Header.BackgroundTransparency = 1
@@ -133,6 +178,7 @@ function DaleyUI:CreateWindow(config)
     Logo.ZIndex                 = 11
     Logo.Parent                 = Header
 
+    -- Dynamically match the Logo color to your outline theme color
     task.spawn(function()
         while ScreenGui.Parent do
             if UISettings.RGBOutline then
@@ -156,6 +202,7 @@ function DaleyUI:CreateWindow(config)
     TitleLbl.ZIndex                 = 11
     TitleLbl.Parent                 = Header
 
+    -- Header Right Controls
     local HeaderRight = Instance.new("Frame")
     HeaderRight.Size                   = UDim2.new(0, 240, 1, 0)
     HeaderRight.Position               = UDim2.new(1, -248, 0, 0)
@@ -223,6 +270,7 @@ function DaleyUI:CreateWindow(config)
     DiscBtn.Parent           = HeaderRight
     Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
 
+    -- Discord Clipboard
     local discDebounce = false
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
@@ -246,6 +294,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = false
     end)
 
+    -- Drag System with Custom State Safeguard
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -257,6 +306,7 @@ function DaleyUI:CreateWindow(config)
     
     UserInputService.InputChanged:Connect(function(i)
         if dragging then
+            -- Fallback verification using custom state tracker (Fixes sticking)
             if not isLeftMouseDown then
                 dragging = false
                 return
@@ -272,9 +322,10 @@ function DaleyUI:CreateWindow(config)
     end)
     
     UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.MouseButton1 then dragging = false end
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 
+    -- Keybind Toggle with Scale Animation
     local uiVisible = true
     local animating = false
 
@@ -312,6 +363,7 @@ function DaleyUI:CreateWindow(config)
         end
     end)
 
+    -- Divider Line
     local Divider = Instance.new("Frame")
     Divider.Size             = UDim2.new(1, 0, 0, 1)
     Divider.Position         = UDim2.new(0, 0, 0, 46)
@@ -320,6 +372,7 @@ function DaleyUI:CreateWindow(config)
     Divider.ZIndex           = 5
     Divider.Parent           = WindowFrame
 
+    -- Sidebar
     local Sidebar = Instance.new("Frame")
     Sidebar.Size             = UDim2.new(0, 158, 1, -46)
     Sidebar.Position         = UDim2.new(0, 0, 0, 46)
@@ -348,6 +401,7 @@ function DaleyUI:CreateWindow(config)
     TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabLayout.Parent    = TabContainer
 
+    -- Page Container
     local PageContainer = Instance.new("Frame")
     PageContainer.Size                   = UDim2.new(1, -172, 1, -58)
     PageContainer.Position               = UDim2.new(0, 166, 0, 52)
@@ -356,6 +410,9 @@ function DaleyUI:CreateWindow(config)
     PageContainer.ZIndex                 = 3
     PageContainer.Parent                 = WindowFrame
 
+    -- =========================================================================
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF) ]] --
+    -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
         BL = { Pos = UDim2.new(0, 0, 1, -16),   Anchor = Vector2.new(0,0), FactorX = -1, FactorY = 1,  MoveX = 1, MoveY = 0 },
@@ -391,8 +448,10 @@ function DaleyUI:CreateWindow(config)
         end)
     end
 
+    -- InputChanged Handler checking custom safety state
     UserInputService.InputChanged:Connect(function(i)
         if activeResize then
+            -- Fallback verification using custom state tracker
             if not isLeftMouseDown then
                 activeResize = false
                 activeCorner = nil
@@ -426,9 +485,14 @@ function DaleyUI:CreateWindow(config)
     end)
 
     local activeTabBtn = nil
+
+    -- =====================================================================
+    -- Window Object
+    -- =====================================================================
     local Window = {}
 
     function Window:CreateTab(name)
+        -- Sidebar Button
         local Btn = Instance.new("TextButton")
         Btn.Name                   = name .. "_Tab"
         Btn.Size                   = UDim2.new(1, 0, 0, 33)
@@ -453,6 +517,7 @@ function DaleyUI:CreateWindow(config)
         Accent.ZIndex                 = 5
         Accent.Parent                 = Btn
 
+        -- Maintain aesthetic accent matching
         task.spawn(function()
             while ScreenGui.Parent do
                 if UISettings.RGBOutline then
@@ -464,6 +529,7 @@ function DaleyUI:CreateWindow(config)
             end
         end)
 
+        -- Scrollable Pages
         local Page = Instance.new("ScrollingFrame")
         Page.Name                   = name .. "_Page"
         Page.Size                   = UDim2.new(1, 0, 1, 0)
@@ -495,6 +561,7 @@ function DaleyUI:CreateWindow(config)
             Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 25)
         end)
 
+        -- Tab click logic
         Btn.MouseButton1Click:Connect(function()
             if activeTabBtn == Btn then return end
             for _, child in ipairs(TabContainer:GetChildren()) do
@@ -529,6 +596,9 @@ function DaleyUI:CreateWindow(config)
             Accent.BackgroundTransparency = 0
         end
 
+        -- =====================================================================
+        -- Tab Object Elements
+        -- =====================================================================
         local Tab = {}
 
         function Tab:CreateSection(text)
@@ -720,7 +790,7 @@ function DaleyUI:CreateWindow(config)
                 or i.UserInputType == Enum.UserInputType.Touch) then update(i.Position.X) end
             end)
             UserInputService.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.MouseButton1
+                if i.UserInputType == Enum.UserInputType.MouseButton1
                 or i.UserInputType == Enum.UserInputType.Touch then draggingSlider = false end
             end)
         end
@@ -920,9 +990,9 @@ function DaleyUI:CreateWindow(config)
             }
         end
 
-        -- =========================================================================
-        -- [[ ⚠️ MOVED COLOR PICKER METHOD INSIDE THE TAB DEFINITIONS ]] --
-        -- =========================================================================
+        -- =====================================================================
+        -- [[ DYNAMIC ROTATABLE COLOR WHEEL ELEMENT ]] --
+        -- =====================================================================
         function Tab:CreateColorPicker(config)
             config = config or {}
             local name = config.Name or "Color Picker"
@@ -949,6 +1019,7 @@ function DaleyUI:CreateWindow(config)
             Label.ZIndex = 6
             Label.Parent = PickerRow
 
+            -- Current Color Indicator Box
             local ColorPreview = Instance.new("Frame")
             ColorPreview.Size = UDim2.new(0, 50, 0, 20)
             ColorPreview.Position = UDim2.new(0, 12, 0, 45)
@@ -962,14 +1033,16 @@ function DaleyUI:CreateWindow(config)
             PreviewStroke.Color = Color3.fromRGB(45, 45, 55)
             PreviewStroke.Thickness = 1
 
+            -- Color Wheel Image (Radial HSV Color Map Asset)
             local Wheel = Instance.new("ImageButton")
             Wheel.Size = UDim2.new(0, 100, 0, 100)
             Wheel.Position = UDim2.new(1, -240, 0.5, -50)
             Wheel.BackgroundTransparency = 1
-            Wheel.Image = "rbxassetid://415583266"
+            Wheel.Image = "rbxassetid://415583266" -- Default High-Res Color Wheel asset
             Wheel.ZIndex = 7
             Wheel.Parent = PickerRow
 
+            -- Cursor Selection Pin
             local WheelPin = Instance.new("Frame")
             WheelPin.Size = UDim2.new(0, 8, 0, 8)
             WheelPin.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -980,6 +1053,7 @@ function DaleyUI:CreateWindow(config)
             Instance.new("UICorner", WheelPin).CornerRadius = UDim.new(1, 0)
             Instance.new("UIStroke", WheelPin).Color = Color3.fromRGB(0, 0, 0)
 
+            -- Saturation / Value Vertical Slider Bar
             local ValSlider = Instance.new("TextButton")
             ValSlider.Size = UDim2.new(0, 15, 0, 100)
             ValSlider.Position = UDim2.new(1, -110, 0.5, -50)
@@ -1007,6 +1081,7 @@ function DaleyUI:CreateWindow(config)
             ValPin.Parent = ValSlider
             Instance.new("UIStroke", ValPin).Color = Color3.fromRGB(0, 0, 0)
 
+            -- Internal State
             local currentH, currentS, currentV = defaultColor:ToHSV()
             local pickingWheel = false
             local pickingVal = false
@@ -1021,6 +1096,7 @@ function DaleyUI:CreateWindow(config)
                 callback(finalColor)
             end
 
+            -- Place initial pins based on default color HSV calculations
             local function updatePins()
                 local r = currentS * 50
                 local angle = currentH * (math.pi * 2)
@@ -1028,6 +1104,7 @@ function DaleyUI:CreateWindow(config)
                 ValPin.Position = UDim2.new(0, -2, 1 - currentV, -2)
             end
 
+            -- Update HSV based on selection position within the Color Wheel circle boundary
             local function processWheel(x, y)
                 local rPos = Vector2.new(x - Wheel.AbsolutePosition.X - 50, y - Wheel.AbsolutePosition.Y - 50)
                 local dist = math.clamp(rPos.Magnitude, 0, 50)
@@ -1047,6 +1124,7 @@ function DaleyUI:CreateWindow(config)
                 updateColor()
             end
 
+            -- Input Listeners
             Wheel.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
                     pickingWheel = true
@@ -1093,9 +1171,15 @@ function DaleyUI:CreateWindow(config)
         return Tab
     end
 
+    -- =========================================================================
+    -- [[ AUTOMATIC COMBINED "MISC" TAB GENERATION ]] --
+    -- =========================================================================
     local MiscTab = Window:CreateTab("Misc")
+
+    -- Customization Settings Section
     MiscTab:CreateSection("Customization Settings")
 
+    -- Toggle RGB Outline
     MiscTab:CreateToggle({
         Name = "RGB Outline Theme",
         Default = UISettings.RGBOutline,
@@ -1104,6 +1188,7 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
+    -- Background Stars Toggle
     MiscTab:CreateToggle({
         Name = "Background Starfield",
         Default = UISettings.StarsEnabled,
@@ -1112,6 +1197,7 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
+    -- Interactive Color Wheel for Theme Color selection (Replaced custom typing)
     MiscTab:CreateColorPicker({
         Name = "Theme Outline Color Picker",
         Default = UISettings.OutlineColor,
@@ -1120,8 +1206,10 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
+    -- Control Settings Section
     MiscTab:CreateSection("Control Settings")
 
+    -- Keybind Change Configuration Box
     MiscTab:CreateTextBox({
         Name = "Change UI Toggle Key (e.g. K, P, L)",
         Callback = function(val)
@@ -1138,95 +1226,4 @@ function DaleyUI:CreateWindow(config)
     return Window
 end
 
-
--- =========================================================================
--- [[ 2. RUNTIME HUB CONFIGURATION AND TEST SCRIPT ]] --
--- =========================================================================
-
-local Window = DaleyUI:CreateWindow({
-    Name = "Daley Hub v1.0",
-    Discord = "https://discord.gg/SeNPuUVsZQ"
-})
-
-local CombatTab = Window:CreateTab("Combat")
-CombatTab:CreateSection("Aimbot & Target Options")
-
-local TargetLabel = CombatTab:CreateLabel("Target System: Idle")
-
-local AimbotToggle = CombatTab:CreateToggle({
-    Name = "Enable Silent Aim",
-    Default = false,
-    Callback = function(state)
-        if state then
-            TargetLabel:Set("Target System: Scanning...")
-        else
-            TargetLabel:Set("Target System: Idle")
-        end
-    end
-})
-
-CombatTab:CreateSlider({
-    Name = "Field Of View (FOV)",
-    Min = 30,
-    Max = 360,
-    Default = 90,
-    Increment = 5,
-    ValueName = "degrees",
-    Callback = function(val)
-        print("Aimbot FOV scaled to:", val)
-    end
-})
-
-local PlayerTab = Window:CreateTab("Player Settings")
-PlayerTab:CreateSection("Movement Settings")
-
-PlayerTab:CreateSlider({
-    Name = "WalkSpeed Multiplier",
-    Min = 16,
-    Max = 250,
-    Default = 16,
-    Increment = 1,
-    ValueName = "studs/sec",
-    Callback = function(val)
-        local char = LP.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").WalkSpeed = val
-        end
-    end
-})
-
-PlayerTab:CreateButton({
-    Name = "Reset Walkspeed",
-    Callback = function()
-        local char = LP.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-        end
-    end
-})
-
-PlayerTab:CreateSection("World Actions")
-
-local TeleportDropdown = PlayerTab:CreateDropdown({
-    Name = "Teleport Locations",
-    Options = {"Lobby", "Spawn", "Shop", "VIP Zone"},
-    Callback = function(selected)
-        print("Simulating teleport to location: " .. selected)
-    end
-})
-
-PlayerTab:CreateTextBox({
-    Name = "Manual Teleport Coordinates (X, Y, Z)",
-    Callback = function(text)
-        print("Attempting parser on user coords: " .. text)
-    end
-})
-
--- This now runs perfectly without crashing!
-PlayerTab:CreateColorPicker({
-    Name = "Chamber Highlight ESP Color",
-    Default = Color3.fromRGB(0, 255, 0),
-    Callback = function(color)
-        print("ESP glow updated to: ", color)
-    end
-})
+return DaleyUI
