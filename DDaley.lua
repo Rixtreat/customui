@@ -9,39 +9,27 @@ local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
 local RunService       = game:GetService("RunService")
+local CoreGui          = game:GetService("CoreGui")
 
--- SAFE LOCAL PLAYER ACQUISITION (Fixes Line 13 Nil Errors)
 local LP = Players.LocalPlayer
-if not LP and RunService:IsClient() then
-    LP = Players:GetPropertyChangedSignal("LocalPlayer"):Wait() or Players.LocalPlayer
-end
 
--- STUDIO SAFE CORE-GUI FALLBACK
-local CoreGui = game:GetService("CoreGui")
-local TargetParent
-pcall(function()
-    -- This safely attempts to use CoreGui, but falls back to PlayerGui in Studio
-    TargetParent = CoreGui
-end)
-if not TargetParent then
-    TargetParent = LP and LP:WaitForChild("PlayerGui")
-end
+-- SAFE TO USE UI PARENT (Completely avoids the nil gethui call error)
+local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
 -- =========================================================================
--- [[ GLOBAL MOUSE STATE TRACKER (FIXES LINE 31 NIL ERRORS) ]] --
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS & NIL ARGUMENTS) ]] --
 -- =========================================================================
 local isLeftMouseDown = false
 
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    -- Added safety check "if input and ..." to prevent indexing nil errors
+UserInputService.InputBegan:Connect(function(input)
+    -- Added safety check 'if input and ...' to prevent index nil errors
     if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    -- Added safety check "if input and ..." to prevent indexing nil errors
+    -- Added safety check 'if input and ...' to prevent index nil errors
     if input and input.UserInputType == Enum.UserInputType.MouseButton1 then
         isLeftMouseDown = false
     end
