@@ -55,7 +55,7 @@ function DaleyUI:CreateWindow(config)
     local windowName  = config.Name     or "Daley Hub"
     
     -- Force-resolve a strict string fallback immediately so clipboard never fails
-    local rawDiscord = config.Discord or config.discord or "https://discord.gg/SeNPuUVsZQ"
+    local rawDiscord = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
     local discordLink = tostring(rawDiscord)
 
     -- Cleanup existing
