@@ -1205,6 +1205,37 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
+    -- ========== ANTI-AFK TOGGLE (ADDED) ==========
+    local antiAFKRunning = false
+    local antiAFKTask = nil
+
+    MiscTab:CreateToggle({
+        Name = "Enable Anti-AFK",
+        Default = false,
+        Callback = function(v)
+            antiAFKRunning = v
+            if v then
+                if antiAFKTask then task.cancel(antiAFKTask) end
+                antiAFKTask = task.spawn(function()
+                    while antiAFKRunning and ScreenGui.Parent do
+                        pcall(function()
+                            local vu = game:GetService("VirtualUser")
+                            vu:CaptureController()
+                            vu:ClickButton2(Vector2.new())
+                        end)
+                        task.wait(60) -- Adjust interval if needed
+                    end
+                end)
+            else
+                if antiAFKTask then
+                    task.cancel(antiAFKTask)
+                    antiAFKTask = nil
+                end
+            end
+        end
+    })
+    -- =============================================
+
     -- Interactive Color Wheel for Theme Color selection (Replaced custom typing)
     MiscTab:CreateColorPicker({
         Name = "Theme Outline Color Picker",
