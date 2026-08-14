@@ -16,6 +16,9 @@ local LP = Players.LocalPlayer
 -- SAFE TO USE UI PARENT (Completely avoids the nil gethui call error)
 local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
+-- Global active dropdown tracker to close existing open menus
+local ActiveDropdownFrame = nil
+
 -- =========================================================================
 -- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
 -- =========================================================================
@@ -390,7 +393,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Size                   = UDim2.new(1, -172, 1, -58)
     PageContainer.Position               = UDim2.new(0, 166, 0, 52)
     PageContainer.BackgroundTransparency = 1
-    PageContainer.ClipsDescendants       = true
+    PageContainer.ClipsDescendants       = false
     PageContainer.ZIndex                 = 3
     PageContainer.Parent                 = WindowFrame
 
@@ -531,6 +534,7 @@ function DaleyUI:CreateWindow(config)
         Page.ScrollingDirection     = Enum.ScrollingDirection.Y
         Page.CanvasSize             = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+        Page.ClipsDescendants       = false
         Page.Parent                 = PageContainer
 
         local PageLayout = Instance.new("UIListLayout")
@@ -880,7 +884,7 @@ function DaleyUI:CreateWindow(config)
             Wrapper.Size             = UDim2.new(1, 0, 0, 38)
             Wrapper.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
             Wrapper.BorderSizePixel  = 0
-            Wrapper.ZIndex           = 15
+            Wrapper.ZIndex           = 5
             Wrapper.ClipsDescendants = false
             Wrapper.Parent           = Page
             Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 7)
@@ -894,7 +898,7 @@ function DaleyUI:CreateWindow(config)
             Lbl.TextSize               = 12
             Lbl.Font                   = Enum.Font.GothamMedium
             Lbl.TextXAlignment         = Enum.TextXAlignment.Left
-            Lbl.ZIndex                 = 16
+            Lbl.ZIndex                 = 6
             Lbl.Parent                 = Wrapper
 
             local SelBtn = Instance.new("TextButton")
@@ -906,7 +910,7 @@ function DaleyUI:CreateWindow(config)
             SelBtn.TextSize         = 11
             SelBtn.Font             = Enum.Font.GothamBold
             SelBtn.BorderSizePixel  = 0
-            SelBtn.ZIndex           = 17
+            SelBtn.ZIndex           = 7
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
@@ -916,7 +920,7 @@ function DaleyUI:CreateWindow(config)
             DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
             DropFrame.BorderSizePixel        = 0
             DropFrame.Visible                = false
-            DropFrame.ZIndex                 = 50
+            DropFrame.ZIndex                 = 105
             DropFrame.ScrollBarThickness     = 3
             DropFrame.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
             DropFrame.ScrollingDirection     = Enum.ScrollingDirection.Y
@@ -933,9 +937,30 @@ function DaleyUI:CreateWindow(config)
             DropLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
             local open = false
+
+            local function setOpenState(state)
+                open = state
+                if open then
+                    if ActiveDropdownFrame and ActiveDropdownFrame ~= DropFrame then
+                        ActiveDropdownFrame.Visible = false
+                        if ActiveDropdownFrame.Parent then
+                            ActiveDropdownFrame.Parent.ZIndex = 5
+                        end
+                    end
+                    ActiveDropdownFrame = DropFrame
+                    Wrapper.ZIndex = 100
+                    DropFrame.Visible = true
+                else
+                    DropFrame.Visible = false
+                    Wrapper.ZIndex = 5
+                    if ActiveDropdownFrame == DropFrame then
+                        ActiveDropdownFrame = nil
+                    end
+                end
+            end
+
             SelBtn.MouseButton1Click:Connect(function()
-                open = not open
-                DropFrame.Visible = open
+                setOpenState(not open)
             end)
 
             local function createOptionButton(item)
@@ -946,7 +971,7 @@ function DaleyUI:CreateWindow(config)
                 Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
                 Opt.TextSize               = 11
                 Opt.Font                   = Enum.Font.GothamMedium
-                Opt.ZIndex                 = 51
+                Opt.ZIndex                 = 106
                 Opt.Parent                 = DropFrame
 
                 Opt.MouseEnter:Connect(function()
@@ -956,8 +981,7 @@ function DaleyUI:CreateWindow(config)
                     TweenService:Create(Opt, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(180,180,188)}):Play()
                 end)
                 Opt.MouseButton1Click:Connect(function()
-                    open = false
-                    DropFrame.Visible = false
+                    setOpenState(false)
                     SelBtn.Text = item
                     callback(item)
                 end)
