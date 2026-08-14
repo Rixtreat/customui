@@ -293,7 +293,6 @@ function DaleyUI:CreateWindow(config)
     
     UserInputService.InputChanged:Connect(function(i)
         if dragging then
-            -- Fallback verification using custom state tracker (Fixes sticking)
             if not isLeftMouseDown then
                 dragging = false
                 return
@@ -393,12 +392,29 @@ function DaleyUI:CreateWindow(config)
     PageContainer.Size                   = UDim2.new(1, -172, 1, -58)
     PageContainer.Position               = UDim2.new(0, 166, 0, 52)
     PageContainer.BackgroundTransparency = 1
-    PageContainer.ClipsDescendants       = false
+    PageContainer.ClipsDescendants       = true
     PageContainer.ZIndex                 = 3
     PageContainer.Parent                 = WindowFrame
 
+    -- Overlay Container for Dropdowns so they don't get clipped by Page Container
+    local OverlayContainer = Instance.new("Frame")
+    OverlayContainer.Name                   = "OverlayContainer"
+    OverlayContainer.Size                   = UDim2.new(1, 0, 1, 0)
+    OverlayContainer.BackgroundTransparency = 1
+    OverlayContainer.ZIndex                 = 100
+    OverlayContainer.ClipsDescendants       = false
+    OverlayContainer.Parent                 = WindowFrame
+
+    -- Close dropdowns when scrolling
+    local function closeActiveDropdown()
+        if ActiveDropdownFrame then
+            ActiveDropdownFrame.Visible = false
+            ActiveDropdownFrame = nil
+        end
+    end
+
     -- =========================================================================
-    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF) ]] --
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS ]] --
     -- =========================================================================
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
@@ -435,10 +451,8 @@ function DaleyUI:CreateWindow(config)
         end)
     end
 
-    -- InputChanged Handler checking custom safety state
     UserInputService.InputChanged:Connect(function(i)
         if activeResize then
-            -- Fallback verification using custom state tracker
             if not isLeftMouseDown then
                 activeResize = false
                 activeCorner = nil
@@ -472,7 +486,7 @@ function DaleyUI:CreateWindow(config)
     end)
 
     local activeTabBtn = nil
-    local tabCount = 0 -- Keeps track of custom tab creation order
+    local tabCount = 0
 
     -- =====================================================================
     -- Window Object
@@ -495,7 +509,7 @@ function DaleyUI:CreateWindow(config)
         Btn.Font                   = Enum.Font.GothamMedium
         Btn.TextXAlignment         = Enum.TextXAlignment.Left
         Btn.ZIndex                 = 4
-        Btn.LayoutOrder            = layoutOrder or tabCount -- High custom priority defaults or standard auto-incremental ordering
+        Btn.LayoutOrder            = layoutOrder or tabCount
         Btn.Parent                 = TabContainer
         Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -508,7 +522,6 @@ function DaleyUI:CreateWindow(config)
         Accent.ZIndex                 = 5
         Accent.Parent                 = Btn
 
-        -- Maintain aesthetic accent matching
         task.spawn(function()
             while ScreenGui.Parent do
                 if UISettings.RGBOutline then
@@ -534,8 +547,10 @@ function DaleyUI:CreateWindow(config)
         Page.ScrollingDirection     = Enum.ScrollingDirection.Y
         Page.CanvasSize             = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize    = Enum.AutomaticSize.Y
-        Page.ClipsDescendants       = false
+        Page.ClipsDescendants       = true
         Page.Parent                 = PageContainer
+
+        Page:GetPropertyChangedSignal("CanvasPosition"):Connect(closeActiveDropdown)
 
         local PageLayout = Instance.new("UIListLayout")
         PageLayout.Padding   = UDim.new(0, 7)
@@ -553,9 +568,9 @@ function DaleyUI:CreateWindow(config)
             Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 25)
         end)
 
-        -- Tab click logic
         Btn.MouseButton1Click:Connect(function()
             if activeTabBtn == Btn then return end
+            closeActiveDropdown()
             for _, child in ipairs(TabContainer:GetChildren()) do
                 if child:IsA("TextButton") then
                     TweenService:Create(child, TweenInfo.new(0.18), {
@@ -580,7 +595,6 @@ function DaleyUI:CreateWindow(config)
             TweenService:Create(Accent, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
         end)
 
-        -- Auto-select first loaded tab ONLY if it is not UI Settings
         if not activeTabBtn and name ~= "UI Settings" then
             activeTabBtn = Btn
             Page.Visible = true
@@ -885,7 +899,6 @@ function DaleyUI:CreateWindow(config)
             Wrapper.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
             Wrapper.BorderSizePixel  = 0
             Wrapper.ZIndex           = 5
-            Wrapper.ClipsDescendants = false
             Wrapper.Parent           = Page
             Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 7)
 
@@ -914,19 +927,19 @@ function DaleyUI:CreateWindow(config)
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
+            -- DropFrame parented to OverlayContainer so it never gets clipped by Page bounds
             local DropFrame = Instance.new("ScrollingFrame")
-            DropFrame.Size                   = UDim2.new(1, 0, 0, math.clamp(#list * 28, 0, 140))
-            DropFrame.Position               = UDim2.new(0, 0, 1, 3)
+            DropFrame.Size                   = UDim2.new(0, 138, 0, math.clamp(#list * 28, 0, 140))
             DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
             DropFrame.BorderSizePixel        = 0
             DropFrame.Visible                = false
-            DropFrame.ZIndex                 = 105
+            DropFrame.ZIndex                 = 200
             DropFrame.ScrollBarThickness     = 3
             DropFrame.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
             DropFrame.ScrollingDirection     = Enum.ScrollingDirection.Y
             DropFrame.Active                 = true
             DropFrame.CanvasSize             = UDim2.new(0, 0, 0, #list * 28)
-            DropFrame.Parent                 = Wrapper
+            DropFrame.Parent                 = OverlayContainer
             Instance.new("UICorner", DropFrame).CornerRadius = UDim.new(0, 6)
 
             local DStroke = Instance.new("UIStroke", DropFrame)
@@ -938,21 +951,25 @@ function DaleyUI:CreateWindow(config)
 
             local open = false
 
+            local function updateDropPosition()
+                local btnPos = SelBtn.AbsolutePosition
+                local winPos = WindowFrame.AbsolutePosition
+                local relX = btnPos.X - winPos.X
+                local relY = btnPos.Y - winPos.Y + SelBtn.AbsoluteSize.Y + 3
+                DropFrame.Position = UDim2.new(0, relX, 0, relY)
+            end
+
             local function setOpenState(state)
                 open = state
                 if open then
                     if ActiveDropdownFrame and ActiveDropdownFrame ~= DropFrame then
                         ActiveDropdownFrame.Visible = false
-                        if ActiveDropdownFrame.Parent then
-                            ActiveDropdownFrame.Parent.ZIndex = 5
-                        end
                     end
+                    updateDropPosition()
                     ActiveDropdownFrame = DropFrame
-                    Wrapper.ZIndex = 100
                     DropFrame.Visible = true
                 else
                     DropFrame.Visible = false
-                    Wrapper.ZIndex = 5
                     if ActiveDropdownFrame == DropFrame then
                         ActiveDropdownFrame = nil
                     end
@@ -971,7 +988,7 @@ function DaleyUI:CreateWindow(config)
                 Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
                 Opt.TextSize               = 11
                 Opt.Font                   = Enum.Font.GothamMedium
-                Opt.ZIndex                 = 106
+                Opt.ZIndex                 = 201
                 Opt.Parent                 = DropFrame
 
                 Opt.MouseEnter:Connect(function()
@@ -1002,7 +1019,7 @@ function DaleyUI:CreateWindow(config)
                             child:Destroy()
                         end
                     end
-                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(#newList * 28, 0, 140))
+                    DropFrame.Size = UDim2.new(0, 138, 0, math.clamp(#newList * 28, 0, 140))
                     DropFrame.CanvasSize = UDim2.new(0, 0, 0, #newList * 28)
                     for _, item in ipairs(newList) do
                         createOptionButton(item)
@@ -1050,7 +1067,6 @@ function DaleyUI:CreateWindow(config)
             Label.ZIndex = 6
             Label.Parent = PickerRow
 
-            -- Current Color Indicator Box
             local ColorPreview = Instance.new("Frame")
             ColorPreview.Size = UDim2.new(0, 50, 0, 20)
             ColorPreview.Position = UDim2.new(0, 12, 0, 45)
@@ -1064,16 +1080,14 @@ function DaleyUI:CreateWindow(config)
             PreviewStroke.Color = Color3.fromRGB(45, 45, 55)
             PreviewStroke.Thickness = 1
 
-            -- Color Wheel Image (Radial HSV Color Map Asset)
             local Wheel = Instance.new("ImageButton")
             Wheel.Size = UDim2.new(0, 100, 0, 100)
             Wheel.Position = UDim2.new(1, -240, 0.5, -50)
             Wheel.BackgroundTransparency = 1
-            Wheel.Image = "rbxassetid://415583266" -- Default High-Res Color Wheel asset
+            Wheel.Image = "rbxassetid://415583266"
             Wheel.ZIndex = 7
             Wheel.Parent = PickerRow
 
-            -- Cursor Selection Pin
             local WheelPin = Instance.new("Frame")
             WheelPin.Size = UDim2.new(0, 8, 0, 8)
             WheelPin.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1084,7 +1098,6 @@ function DaleyUI:CreateWindow(config)
             Instance.new("UICorner", WheelPin).CornerRadius = UDim.new(1, 0)
             Instance.new("UIStroke", WheelPin).Color = Color3.fromRGB(0, 0, 0)
 
-            -- Saturation / Value Vertical Slider Bar
             local ValSlider = Instance.new("TextButton")
             ValSlider.Size = UDim2.new(0, 15, 0, 100)
             ValSlider.Position = UDim2.new(1, -110, 0.5, -50)
@@ -1112,7 +1125,6 @@ function DaleyUI:CreateWindow(config)
             ValPin.Parent = ValSlider
             Instance.new("UIStroke", ValPin).Color = Color3.fromRGB(0, 0, 0)
 
-            -- Internal State
             local currentH, currentS, currentV = defaultColor:ToHSV()
             local pickingWheel = false
             local pickingVal = false
@@ -1127,7 +1139,6 @@ function DaleyUI:CreateWindow(config)
                 callback(finalColor)
             end
 
-            -- Place initial pins based on default color HSV calculations
             local function updatePins()
                 local r = currentS * 50
                 local angle = currentH * (math.pi * 2)
@@ -1135,7 +1146,6 @@ function DaleyUI:CreateWindow(config)
                 ValPin.Position = UDim2.new(0, -2, 1 - currentV, -2)
             end
 
-            -- Update HSV based on selection position within the Color Wheel circle boundary
             local function processWheel(x, y)
                 local rPos = Vector2.new(x - Wheel.AbsolutePosition.X - 50, y - Wheel.AbsolutePosition.Y - 50)
                 local dist = math.clamp(rPos.Magnitude, 0, 50)
@@ -1155,7 +1165,6 @@ function DaleyUI:CreateWindow(config)
                 updateColor()
             end
 
-            -- Input Listeners
             Wheel.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
                     pickingWheel = true
@@ -1204,14 +1213,11 @@ function DaleyUI:CreateWindow(config)
 
     -- =========================================================================
     -- [[ AUTOMATIC COMBINED "UI Settings" TAB GENERATION ]] --
-    -- Layout Priority = 9999 ensures this is always at the absolute bottom.
     -- =========================================================================
     local MiscTab = Window:CreateTab("UI Settings", 9999)
 
-    -- Customization Settings Section
     MiscTab:CreateSection("Customization Settings")
 
-    -- Toggle RGB Outline
     MiscTab:CreateToggle({
         Name = "RGB Outline Theme",
         Default = UISettings.RGBOutline,
@@ -1220,7 +1226,6 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
-    -- Background Stars Toggle
     MiscTab:CreateToggle({
         Name = "Background Starfield",
         Default = UISettings.StarsEnabled,
@@ -1229,7 +1234,6 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
-    -- ========== ANTI-AFK TOGGLE (ADDED) ==========
     local antiAFKRunning = false
     local antiAFKTask = nil
 
@@ -1247,7 +1251,7 @@ function DaleyUI:CreateWindow(config)
                             vu:CaptureController()
                             vu:ClickButton2(Vector2.new())
                         end)
-                        task.wait(60) -- Adjust interval if needed
+                        task.wait(60)
                     end
                 end)
             else
@@ -1258,9 +1262,7 @@ function DaleyUI:CreateWindow(config)
             end
         end
     })
-    -- =============================================
 
-    -- Interactive Color Wheel for Theme Color selection (Replaced custom typing)
     MiscTab:CreateColorPicker({
         Name = "Theme Outline Color Picker",
         Default = UISettings.OutlineColor,
@@ -1269,10 +1271,8 @@ function DaleyUI:CreateWindow(config)
         end
     })
 
-    -- Control Settings Section
     MiscTab:CreateSection("Control Settings")
 
-    -- Keybind Change Configuration Box
     MiscTab:CreateTextBox({
         Name = "Change UI Toggle Key (e.g. K, P, L)",
         Callback = function(val)
