@@ -1,930 +1,1102 @@
-local UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Rixtreat/customui/main/DDaley.lua"))()
+-- =========================================================================
+-- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED UI SETTINGS TAB ]] --
+-- Host this file on GitHub and load it via:
+--   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
+--   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
+-- =========================================================================
 
-local Window = UI:CreateWindow({
-    Name = "Game Hub",
-    SubTitle = "by Daley"
-})
-
--- Tabs
-local MainTab = Window:CreateTab("Movement Controls")
-local AutoTab = Window:CreateTab("Automation")
-
--- Services & References
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local LocalPlayer = Players.LocalPlayer
+local TweenService     = game:GetService("TweenService")
+local RunService       = game:GetService("RunService")
+local CoreGui          = game:GetService("CoreGui")
 
--- Remote Reference
-local RemoteEvent = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Packages"):WaitForChild("Events"):WaitForChild("RemoteEvent")
+local LP = Players.LocalPlayer
 
--- State Variables: Movement
-local SpeedEnabled = false
-local WalkSpeedValue = 16
+-- SAFE TO USE UI PARENT (Completely avoids the nil gethui call error)
+local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
-local NoclipEnabled = false
+-- =========================================================================
+-- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
+-- =========================================================================
+local isLeftMouseDown = false
 
-local FlyEnabled = false
-local FlySpeedValue = 50
-local flyBodyVelocity = nil
-local flyBodyGyro = nil
-local flyConnection = nil
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = true
+    end
+end)
 
--- Config Mapping: Index -> Enemy & Difficulty Meta
-local IndexToEnemyMeta = {
-    ["1"] = { EnemyId = "Sand", Difficulty = "Easy" },
-    ["2"] = { EnemyId = "Lokki", Difficulty = "Medium" },
-    ["3"] = { EnemyId = "Xebek", Difficulty = "Hard" },
-    ["4"] = { EnemyId = "Blakbeard", Difficulty = "Ultra Hard" },
-    ["5"] = { EnemyId = "Kizaro", Difficulty = "Boss" }
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = false
+    end
+end)
+
+-- =========================================================================
+-- [[ LIBRARY OBJECT ]] --
+-- =========================================================================
+local DaleyUI = {}
+DaleyUI.__index = DaleyUI
+
+-- Global Settings Reference (Shared between Library, Windows, and UI Settings)
+local UISettings = {
+    RGBOutline = true,
+    OutlineColor = Color3.fromRGB(255, 50, 50),
+    ToggleKey = Enum.KeyCode.K,
+    StarsEnabled = true
 }
 
--- State Variables: Auto Farm Spawners
-local AutoFarmEnabled = false
-local AutoFarmInterval = 1
-local FarmWalkSpeed = 50
-local SelectedFarmTarget = "All"
-local currentSpawnerIndex = 1
+-- =========================================================================
+-- [[ CREATE WINDOW ]] --
+-- =========================================================================
+function DaleyUI:CreateWindow(config)
+    config = config or {}
+    local windowName  = config.Name     or "Daley Hub"
 
--- State Variables: Network Automations
-local AutoRankUpEnabled = false
-local AutoRankUpInterval = 0.5
-local AutoCoinUpgradesEnabled = false
-local AutoCoinUpgradesInterval = 0.5
+    -- Force-resolve a strict string fallback immediately so clipboard never fails
+    local rawDiscord = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
+    local discordLink = tostring(rawDiscord)
 
-local AutoAttackUpgradeEnabled = false
-local AutoAttackUpgradeInterval = 0.5
-local SelectedAttackUpgradeType = "Radius"
-
-local AutoAscendEnabled = false
-local AutoAscendInterval = 1
-local SelectedAscendTier = 1
-local SelectedAscendCharacter = "Garuo"
-
-local AutoSummonEnabled = false
-local AutoSummonInterval = 0.5
-local SelectedSummonBanner = "Mythic"
-local SelectedSummonAmount = 1
-local SelectedSummonType = "Normal"
-
-local AutoRollEnabled = false
-local AutoClaimEnabled = false
-local AutoJoinDungeonEnabled = false
-local AutoJoinDungeonInterval = 1
-
-local SelectedRollMode = "single"
-local SelectedBanner = "skylands"
-
--- State Variables: Auto Skill Tree
-local AutoSkillTreeEnabled = false
-local AutoSkillTreeInterval = 0.5
-local SkillTreeController = nil
-
--- State Variables: Key Spammers
-local AutoSpamGEnabled = false
-local AutoSpamGInterval = 0.1
-
-local AutoSpamVEnabled = false
-local AutoSpamVInterval = 0.1
-
--- Helper Functions
-local function getCharacter()
-    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-end
-
-local function stopFlying()
-    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
-    if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
-    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
-    
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").PlatformStand = false
+    -- Cleanup existing
+    if TargetParent:FindFirstChild("DaleyStarfieldUI") then
+        TargetParent.DaleyStarfieldUI:Destroy()
     end
-end
 
-local function toggleFly(enable)
-    if not enable then stopFlying() return end
+    -- ScreenGui
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name           = "DaleyStarfieldUI"
+    ScreenGui.ResetOnSpawn   = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent         = TargetParent
 
-    local char = getCharacter()
-    local root = char:WaitForChild("HumanoidRootPart")
-    local humanoid = char:WaitForChild("Humanoid")
+    -- Main Window Frame
+    local WindowFrame = Instance.new("Frame")
+    WindowFrame.Name             = "MainWindow"
+    WindowFrame.Size             = UDim2.new(0, 650, 0, 420)
+    WindowFrame.Position         = UDim2.new(0.5, -325, 0.5, -210)
+    WindowFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    WindowFrame.BorderSizePixel  = 0
+    WindowFrame.ClipsDescendants = false
+    WindowFrame.Active           = true
+    WindowFrame.Parent           = ScreenGui
+    Instance.new("UICorner", WindowFrame).CornerRadius = UDim.new(0, 12)
 
-    stopFlying()
+    -- RGB / Static Outline Border
+    local RGBStroke = Instance.new("UIStroke")
+    RGBStroke.Thickness       = 2
+    RGBStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    RGBStroke.Parent          = WindowFrame
 
-    flyBodyVelocity = Instance.new("BodyVelocity")
-    flyBodyVelocity.Name = "CustomFlyVelocity"
-    flyBodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    flyBodyVelocity.Velocity = Vector3.zero
-    flyBodyVelocity.Parent = root
-
-    flyBodyGyro = Instance.new("BodyGyro")
-    flyBodyGyro.Name = "CustomFlyGyro"
-    flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    flyBodyGyro.P = 9e4
-    flyBodyGyro.CFrame = root.CFrame
-    flyBodyGyro.Parent = root
-
-    flyConnection = RunService.RenderStepped:Connect(function()
-        local cam = workspace.CurrentCamera
-        if not FlyEnabled or not char or not root or not root.Parent or not cam then 
-            stopFlying() 
-            return 
+    -- Dynamic Border Loop
+    task.spawn(function()
+        local hue = 0
+        while ScreenGui.Parent do
+            if UISettings.RGBOutline then
+                hue = (hue + 1) % 360
+                RGBStroke.Color = Color3.fromHSV(hue / 360, 0.85, 1)
+            else
+                RGBStroke.Color = UISettings.OutlineColor
+            end
+            task.wait()
         end
-
-        humanoid.PlatformStand = true
-        local moveVector = Vector3.zero
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector = moveVector + cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector = moveVector - cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector = moveVector - cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector = moveVector + cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVector = moveVector + Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveVector = moveVector - Vector3.new(0, 1, 0) end
-
-        if moveVector.Magnitude > 0 then moveVector = moveVector.Unit end
-
-        flyBodyVelocity.Velocity = moveVector * FlySpeedValue
-        flyBodyGyro.CFrame = cam.CFrame
     end)
-end
 
--- Helper Function to simulate key presses safely
-local function pressKey(keyCode)
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-        task.wait(0.02)
-        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
-    end)
-end
+    -- Starfield Star Container
+    local StarContainer = Instance.new("Frame")
+    StarContainer.Size                   = UDim2.new(1, 0, 1, 0)
+    StarContainer.BackgroundTransparency = 1
+    StarContainer.ZIndex                 = 1
+    StarContainer.ClipsDescendants       = true
+    StarContainer.Parent                 = WindowFrame
+    Instance.new("UICorner", StarContainer).CornerRadius = UDim.new(0, 12)
 
--- Filter Match Checker
-local function matchesFilter(enemyId, difficulty, selection)
-    if selection == "All" or not selection then return true end
+    local stars = {}
+    for i = 1, 70 do
+        local s = Instance.new("Frame")
+        s.Size                   = UDim2.new(0, math.random(1,3), 0, math.random(1,3))
+        s.BackgroundColor3       = Color3.fromRGB(255, 255, 255)
+        s.BackgroundTransparency = math.random(2,7)/10
+        s.BorderSizePixel        = 0
+        s.ZIndex                 = 1
+        s.Position               = UDim2.new(math.random(), 0, math.random(), 0)
+        s.Parent                 = StarContainer
+        Instance.new("UICorner", s).CornerRadius = UDim.new(1, 0)
+        table.insert(stars, {f = s, spd = math.random(5,18)/1000})
+    end
 
-    -- Difficulty Match
-    if selection == "Easy" and difficulty == "Easy" then return true end
-    if selection == "Medium" and difficulty == "Medium" then return true end
-    if selection == "Hard" and difficulty == "Hard" then return true end
-    if selection == "Ultra Hard" and difficulty == "Ultra Hard" then return true end
-    if selection == "Boss" and difficulty == "Boss" then return true end
+    RunService.RenderStepped:Connect(function(dt)
+        if not ScreenGui.Parent then return end
 
-    -- Enemy Name Match
-    if string.lower(enemyId) == string.lower(selection) then return true end
+        -- Instantly toggle visual container visibility based on global setting
+        StarContainer.Visible = UISettings.StarsEnabled
 
-    return false
-end
-
--- ===== AUTO FARM NORMAL WALKING TO SPAWNERS LOGIC =====
-
-local function scanSpawners()
-    local spawnersList = {}
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    local skylandsFolder = zonesFolder and zonesFolder:FindFirstChild("skylands")
-    local spawnersFolder = skylandsFolder and skylandsFolder:FindFirstChild("Spawners")
-
-    if spawnersFolder then
-        for _, spawner in ipairs(spawnersFolder:GetChildren()) do
-            local spawnerName = tostring(spawner.Name)
-            local meta = IndexToEnemyMeta[spawnerName] or {}
-
-            local enemyId = spawner:GetAttribute("EnemyId") or meta.EnemyId or spawnerName
-            local difficulty = spawner:GetAttribute("Difficulty") or meta.Difficulty or "Unknown"
-
-            if matchesFilter(enemyId, difficulty, SelectedFarmTarget) then
-                local targetPart = nil
-                if spawner:IsA("BasePart") then
-                    targetPart = spawner
+        if UISettings.StarsEnabled then
+            for _, sd in ipairs(stars) do
+                local nx = sd.f.Position.X.Scale - sd.spd * dt
+                if nx < -0.02 then
+                    sd.f.Position = UDim2.new(1.02, 0, math.random(), 0)
                 else
-                    targetPart = spawner:FindFirstChild("HumanoidRootPart", true) 
-                        or spawner:FindFirstChildWhichIsA("BasePart", true)
-                end
-
-                if targetPart then
-                    table.insert(spawnersList, targetPart)
+                    sd.f.Position = UDim2.new(nx, 0, sd.f.Position.Y.Scale, 0)
                 end
             end
         end
-    end
+    end)
 
-    return spawnersList
-end
+    -- Header
+    local Header = Instance.new("Frame")
+    Header.Size                   = UDim2.new(1, 0, 0, 46)
+    Header.BackgroundTransparency = 1
+    Header.Active                 = true
+    Header.ZIndex                 = 10
+    Header.Parent                 = WindowFrame
 
-local function walkToNextSpawner()
-    local spawners = scanSpawners()
-    if #spawners == 0 then return end
+    local Logo = Instance.new("TextLabel")
+    Logo.Size                   = UDim2.new(0, 34, 0, 34)
+    Logo.Position               = UDim2.new(0, 12, 0.5, -17)
+    Logo.BackgroundTransparency = 1
+    Logo.Text                   = "D"
+    Logo.TextColor3             = Color3.fromRGB(255, 50, 50)
+    Logo.TextSize               = 26
+    Logo.Font                   = Enum.Font.LuckiestGuy
+    Logo.ZIndex                 = 11
+    Logo.Parent                 = Header
 
-    if currentSpawnerIndex > #spawners then currentSpawnerIndex = 1 end
+    -- Dynamically match the Logo color to your outline theme color
+    task.spawn(function()
+        while ScreenGui.Parent do
+            if UISettings.RGBOutline then
+                Logo.TextColor3 = RGBStroke.Color
+            else
+                Logo.TextColor3 = UISettings.OutlineColor
+            end
+            task.wait(0.1)
+        end
+    end)
 
-    local targetSpawner = spawners[currentSpawnerIndex]
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    local TitleLbl = Instance.new("TextLabel")
+    TitleLbl.Size                   = UDim2.new(0, 200, 0, 34)
+    TitleLbl.Position               = UDim2.new(0, 50, 0.5, -17)
+    TitleLbl.BackgroundTransparency = 1
+    TitleLbl.Text                   = windowName
+    TitleLbl.TextColor3             = Color3.fromRGB(230, 230, 235)
+    TitleLbl.TextSize               = 11
+    TitleLbl.Font                   = Enum.Font.GothamBold
+    TitleLbl.TextXAlignment         = Enum.TextXAlignment.Left
+    TitleLbl.ZIndex                 = 11
+    TitleLbl.Parent                 = Header
 
-    if root and humanoid and targetSpawner and targetSpawner:IsDescendantOf(workspace) then
-        humanoid:MoveTo(targetSpawner.Position)
+    -- Header Right Controls
+    local HeaderRight = Instance.new("Frame")
+    HeaderRight.Size                   = UDim2.new(0, 240, 1, 0)
+    HeaderRight.Position               = UDim2.new(1, -248, 0, 0)
+    HeaderRight.BackgroundTransparency = 1
+    HeaderRight.ZIndex                 = 11
+    HeaderRight.Parent                 = Header
 
-        local reached = false
-        local connection = humanoid.MoveToFinished:Connect(function()
-            reached = true
+    local HRL = Instance.new("UIListLayout")
+    HRL.FillDirection       = Enum.FillDirection.Horizontal
+    HRL.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    HRL.VerticalAlignment   = Enum.VerticalAlignment.Center
+    HRL.Padding             = UDim.new(0, 10)
+    HRL.SortOrder           = Enum.SortOrder.LayoutOrder
+    HRL.Parent              = HeaderRight
+
+    local CtrlFrame = Instance.new("Frame")
+    CtrlFrame.Size                   = UDim2.new(0, 64, 0, 30)
+    CtrlFrame.BackgroundTransparency = 1
+    CtrlFrame.ZIndex                 = 11
+    CtrlFrame.LayoutOrder            = 2
+    CtrlFrame.Parent                 = HeaderRight
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size                   = UDim2.new(0, 28, 0, 28)
+    CloseBtn.Position               = UDim2.new(1, -28, 0.5, -14)
+    CloseBtn.BackgroundTransparency = 1
+    CloseBtn.Text                   = "×"
+    CloseBtn.TextColor3             = Color3.fromRGB(180, 70, 70)
+    CloseBtn.TextSize               = 22
+    CloseBtn.Font                   = Enum.Font.GothamMedium
+    CloseBtn.ZIndex                 = 12
+    CloseBtn.Parent                 = CtrlFrame
+    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+    local MinBtn = Instance.new("TextButton")
+    MinBtn.Size                   = UDim2.new(0, 28, 0, 28)
+    MinBtn.Position               = UDim2.new(1, -60, 0.5, -14)
+    MinBtn.BackgroundTransparency = 1
+    MinBtn.Text                   = "—"
+    MinBtn.TextColor3             = Color3.fromRGB(170, 170, 175)
+    MinBtn.TextSize         = 14
+    MinBtn.Font             = Enum.Font.GothamMedium
+    MinBtn.ZIndex           = 12
+    MinBtn.Parent           = CtrlFrame
+
+    local minimized    = false
+    local originalSize = WindowFrame.Size
+    MinBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        TweenService:Create(WindowFrame, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = minimized and UDim2.new(0, WindowFrame.Size.X.Offset, 0, 46) or UDim2.new(0, WindowFrame.Size.X.Offset, 0, originalSize.Y.Offset)
+        }):Play()
+    end)
+
+    local DiscBtn = Instance.new("TextButton")
+    DiscBtn.Size             = UDim2.new(0, 106, 0, 26)
+    DiscBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    DiscBtn.Text             = "Join Discord"
+    DiscBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+    DiscBtn.TextSize         = 12
+    DiscBtn.Font             = Enum.Font.GothamBold
+    DiscBtn.BorderSizePixel  = 0
+    DiscBtn.ZIndex           = 12
+    DiscBtn.LayoutOrder      = 1
+    DiscBtn.Parent           = HeaderRight
+    Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
+
+    -- Discord Clipboard
+    local discDebounce = false
+    DiscBtn.MouseButton1Click:Connect(function()
+        if discDebounce then return end
+        discDebounce = true
+        DiscBtn.Text = "Copied!"
+        TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
+
+        pcall(function()
+            if setclipboard then setclipboard(discordLink)
+            elseif toclipboard then toclipboard(discordLink)
+            elseif writeclipboard then writeclipboard(discordLink)
+            elseif set_clipboard then set_clipboard(discordLink)
+            elseif syn and syn.write_clipboard then syn.write_clipboard(discordLink)
+            elseif fluxus and fluxus.set_clipboard then fluxus.set_clipboard(discordLink)
+            end
         end)
 
-        local startTime = tick()
-        while not reached and AutoFarmEnabled and (tick() - startTime < 30) do
-            if not root or not root.Parent or (root.Position - targetSpawner.Position).Magnitude <= 5 then
-                break
+        task.wait(2)
+        DiscBtn.Text = "Join Discord"
+        TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
+        discDebounce = false
+    end)
+
+    -- Drag System with Custom State Safeguard
+    local dragging, dragStart, startPos = false, nil, nil
+    Header.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging  = true
+            dragStart = i.Position
+            startPos  = WindowFrame.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging then
+            -- Fallback verification using custom state tracker (Fixes sticking)
+            if not isLeftMouseDown then
+                dragging = false
+                return
             end
-            task.wait(0.1)
-        end
-
-        if connection then connection:Disconnect() end
-
-        currentSpawnerIndex = (currentSpawnerIndex % #spawners) + 1
-    end
-end
-
--- Continuous Stepped Loop for Speed & Noclip
-RunService.Stepped:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    -- Noclip Logic
-    if NoclipEnabled then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
-        end
-    end
-
-    -- WalkSpeed Logic
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        if SpeedEnabled then
-            humanoid.WalkSpeed = WalkSpeedValue
-        elseif AutoFarmEnabled then
-            humanoid.WalkSpeed = FarmWalkSpeed
-        end
-    end
-end)
-
--- Auto Farm Loop
-task.spawn(function()
-    while true do
-        if AutoFarmEnabled then
-            pcall(walkToNextSpawner)
-            task.wait(AutoFarmInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Character Reset/Respawn Handler
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if FlyEnabled then toggleFly(true) end
-    if not SpeedEnabled and not AutoFarmEnabled and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-    end
-end)
-
--- ===== AUTO SKILL TREE LOGIC =====
-
-local function getSkillTreeController()
-    if SkillTreeController then return SkillTreeController end
-
-    for _, obj in ipairs(getloadedmodules and getloadedmodules() or {}) do
-        if type(obj) == "table" and rawget(obj, "GetRecommendedNode") and rawget(obj, "RequestBuy") then
-            SkillTreeController = obj
-            return SkillTreeController
-        end
-    end
-    
-    if getgenv().SkillTreeController then
-        SkillTreeController = getgenv().SkillTreeController
-    end
-
-    return SkillTreeController
-end
-
-local function unlockAvailableNodes()
-    local controller = getSkillTreeController()
-    if not controller or not controller.GetRecommendedNode then return end
-
-    local recommendedNode = controller:GetRecommendedNode()
-    
-    while recommendedNode and AutoSkillTreeEnabled do
-        local nodeName = recommendedNode.Name
-        local canUnlock = controller.CanUnlockSkill and controller:CanUnlockSkill(nodeName)
-        
-        if canUnlock then
-            controller:RequestBuy(nodeName)
-            if controller.Deselect then
-                controller:Deselect()
-            end
-            task.wait(0.1)
-            recommendedNode = controller:GetRecommendedNode()
-        else
-            break
-        end
-    end
-end
-
--- Skill Tree Automation Loop
-task.spawn(function()
-    while true do
-        if AutoSkillTreeEnabled then
-            pcall(unlockAvailableNodes)
-            task.wait(AutoSkillTreeInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- ===== KEY SPAMMER AUTOMATION LOOPS =====
-
--- Auto Spam G Loop
-task.spawn(function()
-    while true do
-        if AutoSpamGEnabled then
-            pressKey(Enum.KeyCode.G)
-            task.wait(AutoSpamGInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Spam V Loop
-task.spawn(function()
-    while true do
-        if AutoSpamVEnabled then
-            pressKey(Enum.KeyCode.V)
-            task.wait(AutoSpamVInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- ===== NETWORK AUTOMATION LOOPS =====
-
--- Auto Join Dungeon Loop
-task.spawn(function()
-    while true do
-        if AutoJoinDungeonEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "gamemodes/join",
-                        Params = {
-                            "Dungeon:1"
-                        }
-                    }
-                })
-            end)
-            task.wait(AutoJoinDungeonInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Rankup Power Loop
-task.spawn(function()
-    while true do
-        if AutoRankUpEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "rankup/power",
-                        Params = {}
-                    }
-                })
-            end)
-            task.wait(AutoRankUpInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Coin Upgrades Loop
-task.spawn(function()
-    while true do
-        if AutoCoinUpgradesEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "coinupgrades/upgrade",
-                        Params = {
-                            "Coins"
-                        }
-                    }
-                })
-            end)
-            task.wait(AutoCoinUpgradesInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Attack Upgrade Loop
-task.spawn(function()
-    while true do
-        if AutoAttackUpgradeEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "autoAttack/upgrade",
-                        Params = {
-                            SelectedAttackUpgradeType
-                        }
-                    }
-                })
-            end)
-            task.wait(AutoAttackUpgradeInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Ascend Loop
-task.spawn(function()
-    while true do
-        if AutoAscendEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "Ascend",
-                        Params = {
-                            SelectedAscendTier,
-                            SelectedAscendCharacter
-                        }
-                    }
-                })
-            end)
-            task.wait(AutoAscendInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Summon Loop
-task.spawn(function()
-    while true do
-        if AutoSummonEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "banner/requestRoll",
-                        Params = {
-                            "Mythic",
-                            SelectedSummonAmount,
-                            SelectedSummonType
-                        }
-                    }
-                })
-            end)
-            task.wait(AutoSummonInterval)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Roll Champion Loop
-task.spawn(function()
-    while true do
-        if AutoRollEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({
-                    {
-                        Path = "champions/spin",
-                        Params = {
-                            SelectedRollMode,
-                            SelectedBanner
-                        }
-                    }
-                })
-            end)
-            task.wait(0.5)
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Claim Rewards Loop
-task.spawn(function()
-    while true do
-        if AutoClaimEnabled then
-            pcall(function()
-                RemoteEvent:FireServer({{ Path = "missions/claimAll", Params = {} }})
-                RemoteEvent:FireServer({{ Path = "achievement/claimAll", Params = {} }})
-                RemoteEvent:FireServer({{ Path = "TimeRewards/ClaimAll", Params = {} }})
-                RemoteEvent:FireServer({{ Path = "DailyRewards/Claim", Params = {} }})
-            end)
-            task.wait(2)
-        else
-            task.wait(1)
-        end
-    end
-end)
-
--- ===== UI CONTROLS =====
-
--- Movement Controls Tab
-MainTab:CreateSection("Speed Settings")
-
-MainTab:CreateToggle({
-    Name = "Enable Speed Mode",
-    Default = false,
-    Callback = function(Value)
-        SpeedEnabled = Value
-        if not Value then
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChildOfClass("Humanoid") then
-                char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = i.Position - dragStart
+                WindowFrame.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
             end
         end
-    end,
-})
+    end)
 
-MainTab:CreateSlider({
-    Name = "WalkSpeed",
-    Min = 16,
-    Max = 300,
-    Default = 16,
-    Callback = function(Value)
-        WalkSpeedValue = Value
-    end,
-})
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
 
-MainTab:CreateSection("Collision Settings")
+    -- Keybind Toggle with Scale Animation
+    local uiVisible = true
+    local animating = false
 
-MainTab:CreateToggle({
-    Name = "Enable Noclip Mode",
-    Default = false,
-    Callback = function(Value)
-        NoclipEnabled = Value
-    end,
-})
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == UISettings.ToggleKey then
+            if animating then return end
+            animating = true
+            uiVisible = not uiVisible
 
-MainTab:CreateSection("Fly Settings")
-
-MainTab:CreateToggle({
-    Name = "Enable Fly Mode",
-    Default = false,
-    Callback = function(Value)
-        FlyEnabled = Value
-        toggleFly(Value)
-    end,
-})
-
-MainTab:CreateSlider({
-    Name = "Fly Speed",
-    Min = 10,
-    Max = 300,
-    Default = 50,
-    Callback = function(Value)
-        FlySpeedValue = Value
-    end,
-})
-
--- Automation Tab
-AutoTab:CreateSection("Gamemode Automation")
-
-AutoTab:CreateToggle({
-    Name = "Auto Join Dungeon",
-    Default = false,
-    Callback = function(Value)
-        AutoJoinDungeonEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Dungeon Join Interval",
-    Min = 0.5,
-    Max = 10,
-    Default = 1,
-    Callback = function(Value)
-        AutoJoinDungeonInterval = Value
-    end,
-})
-
-AutoTab:CreateSection("Keybind Spammers")
-
-AutoTab:CreateToggle({
-    Name = "Auto Use Skill (G)",
-    Default = false,
-    Callback = function(Value)
-        AutoSpamGEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "G Skill Delay",
-    Min = 0.05,
-    Max = 2,
-    Default = 0.1,
-    Callback = function(Value)
-        AutoSpamGInterval = Value
-    end,
-})
-
-AutoTab:CreateToggle({
-    Name = "Auto Use Skill (V)",
-    Default = false,
-    Callback = function(Value)
-        AutoSpamVEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "V Skill Delay",
-    Min = 0.05,
-    Max = 2,
-    Default = 0.1,
-    Callback = function(Value)
-        AutoSpamVInterval = Value
-    end,
-})
-
-AutoTab:CreateSection("Skylands Spawner Auto Farm")
-
-AutoTab:CreateDropdown({
-    Name = "Farm Target Filter",
-    Options = {
-        "All",
-        "Easy",
-        "Medium",
-        "Hard",
-        "Ultra Hard",
-        "Boss",
-        "Sand",
-        "Lokki",
-        "Xebek",
-        "Blakbeard",
-        "Kizaro"
-    },
-    Default = "All",
-    Callback = function(Option)
-        SelectedFarmTarget = Option
-        currentSpawnerIndex = 1
-    end,
-})
-
-AutoTab:CreateToggle({
-    Name = "Enable Auto Farm Spawners",
-    Default = false,
-    Callback = function(Value)
-        AutoFarmEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Walk to Spawner Speed",
-    Min = 16,
-    Max = 300,
-    Default = 50,
-    Callback = function(Value)
-        FarmWalkSpeed = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Wait Interval Between Spawners",
-    Min = 0.1,
-    Max = 10,
-    Default = 1,
-    Callback = function(Value)
-        AutoFarmInterval = Value
-    end,
-})
-
-AutoTab:CreateSection("Skill Tree Automation")
-
-AutoTab:CreateToggle({
-    Name = "Auto Unlock Skill Tree",
-    Default = false,
-    Callback = function(Value)
-        AutoSkillTreeEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Skill Unlock Check Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 0.5,
-    Callback = function(Value)
-        AutoSkillTreeInterval = Value
-    end,
-})
-
-AutoTab:CreateSection("Character & Power Progression")
-
-AutoTab:CreateToggle({
-    Name = "Auto Upgrade Auto Attack",
-    Default = false,
-    Callback = function(Value)
-        AutoAttackUpgradeEnabled = Value
-    end,
-})
-
-AutoTab:CreateDropdown({
-    Name = "Attack Upgrade Type",
-    Options = {"Radius", "Interval", "Damage"},
-    Default = "Radius",
-    Callback = function(Option)
-        SelectedAttackUpgradeType = Option
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Attack Upgrade Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 0.5,
-    Callback = function(Value)
-        AutoAttackUpgradeInterval = Value
-    end,
-})
-
-AutoTab:CreateToggle({
-    Name = "Auto Ascend",
-    Default = false,
-    Callback = function(Value)
-        AutoAscendEnabled = Value
-    end,
-})
-
-AutoTab:CreateTextBox({
-    Name = "Ascend Character Name",
-    PlaceholderText = "Garuo",
-    Callback = function(Text)
-        if Text and Text ~= "" then
-            SelectedAscendCharacter = Text
+            if uiVisible then
+                WindowFrame.Visible = true
+                TweenService:Create(WindowFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Size = originalSize
+                }):Play()
+                local t = TweenService:Create(WindowFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundTransparency = 0
+                })
+                t:Play()
+                t.Completed:Wait()
+                animating = false
+            else
+                originalSize = WindowFrame.Size
+                TweenService:Create(WindowFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0, 0, 0, 0)
+                }):Play()
+                local t = TweenService:Create(WindowFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    BackgroundTransparency = 1
+                })
+                t:Play()
+                t.Completed:Wait()
+                WindowFrame.Visible = false
+                animating = false
+            end
         end
-    end,
-})
+    end)
 
-AutoTab:CreateSlider({
-    Name = "Ascend Tier",
-    Min = 1,
-    Max = 10,
-    Default = 1,
-    Callback = function(Value)
-        SelectedAscendTier = Value
-    end,
-})
+    -- Divider Line
+    local Divider = Instance.new("Frame")
+    Divider.Size             = UDim2.new(1, 0, 0, 1)
+    Divider.Position         = UDim2.new(0, 0, 0, 46)
+    Divider.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    Divider.BorderSizePixel  = 0
+    Divider.ZIndex           = 5
+    Divider.Parent           = WindowFrame
 
-AutoTab:CreateSlider({
-    Name = "Auto Ascend Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 1,
-    Callback = function(Value)
-        AutoAscendInterval = Value
-    end,
-})
+    -- Sidebar
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Size             = UDim2.new(0, 158, 1, -46)
+    Sidebar.Position         = UDim2.new(0, 0, 0, 46)
+    Sidebar.BackgroundColor3 = Color3.fromRGB(13, 13, 16)
+    Sidebar.BorderSizePixel  = 0
+    Sidebar.ZIndex           = 3
+    Sidebar.Parent           = WindowFrame
 
-AutoTab:CreateToggle({
-    Name = "Auto Rank Up Power",
-    Default = false,
-    Callback = function(Value)
-        AutoRankUpEnabled = Value
-    end,
-})
+    local SidebarLine = Instance.new("Frame")
+    SidebarLine.Size             = UDim2.new(0, 1, 1, 0)
+    SidebarLine.Position         = UDim2.new(1, 0, 0, 0)
+    SidebarLine.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    SidebarLine.BorderSizePixel  = 0
+    SidebarLine.ZIndex           = 4
+    SidebarLine.Parent           = Sidebar
 
-AutoTab:CreateSlider({
-    Name = "Auto Rankup Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 0.5,
-    Callback = function(Value)
-        AutoRankUpInterval = Value
-    end,
-})
+    local TabContainer = Instance.new("Frame")
+    TabContainer.Size                   = UDim2.new(1, -14, 1, -20)
+    TabContainer.Position               = UDim2.new(0, 7, 0, 12)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.ZIndex                 = 4
+    TabContainer.Parent                 = Sidebar
 
-AutoTab:CreateToggle({
-    Name = "Auto Coin Upgrades",
-    Default = false,
-    Callback = function(Value)
-        AutoCoinUpgradesEnabled = Value
-    end,
-})
+    local TabLayout = Instance.new("UIListLayout")
+    TabLayout.Padding   = UDim.new(0, 5)
+    TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabLayout.Parent    = TabContainer
 
-AutoTab:CreateSlider({
-    Name = "Auto Coin Upgrade Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 0.5,
-    Callback = function(Value)
-        AutoCoinUpgradesInterval = Value
-    end,
-})
+    -- Page Container
+    local PageContainer = Instance.new("Frame")
+    PageContainer.Size                   = UDim2.new(1, -172, 1, -58)
+    PageContainer.Position               = UDim2.new(0, 166, 0, 52)
+    PageContainer.BackgroundTransparency = 1
+    PageContainer.ClipsDescendants       = true
+    PageContainer.ZIndex                 = 3
+    PageContainer.Parent                 = WindowFrame
 
-AutoTab:CreateButton({
-    Name = "Unlock Haki Gacha",
-    Callback = function()
-        RemoteEvent:FireServer({
-            {
-                Path = "systems/unlock",
-                Params = {
-                    "HakiGacha"
-                }
+    -- =========================================================================
+    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS (STUCK-PROOF) ]] --
+    -- =========================================================================
+    local resizeHandles = {
+        BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
+        BL = { Pos = UDim2.new(0, 0, 1, -16),   Anchor = Vector2.new(0,0), FactorX = -1, FactorY = 1,  MoveX = 1, MoveY = 0 },
+        TR = { Pos = UDim2.new(1, -16, 0, 0),   Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = -1, MoveX = 0, MoveY = 1 },
+        TL = { Pos = UDim2.new(0, 0, 0, 0),     Anchor = Vector2.new(0,0), FactorX = -1, FactorY = -1, MoveX = 1, MoveY = 1 }
+    }
+
+    local activeResize = false
+    local activeCorner = nil
+    local resizeStartMouse = nil
+    local resizeStartSize = nil
+    local resizeStartPos = nil
+
+    for cornerName, info in pairs(resizeHandles) do
+        local Handle = Instance.new("ImageButton")
+        Handle.Name                   = cornerName .. "_Resize"
+        Handle.Size                   = UDim2.new(0, 16, 0, 16)
+        Handle.Position               = info.Pos
+        Handle.BackgroundTransparency = 1 
+        Handle.Image                  = "rbxassetid://0"
+        Handle.BorderSizePixel        = 0
+        Handle.ZIndex                 = 100
+        Handle.Parent                 = WindowFrame
+
+        Handle.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                activeResize     = true
+                activeCorner     = info
+                resizeStartMouse = i.Position
+                resizeStartSize  = WindowFrame.Size
+                resizeStartPos   = WindowFrame.Position
+            end
+        end)
+    end
+
+    -- InputChanged Handler checking custom safety state
+    UserInputService.InputChanged:Connect(function(i)
+        if activeResize then
+            -- Fallback verification using custom state tracker
+            if not isLeftMouseDown then
+                activeResize = false
+                activeCorner = nil
+                return
+            end
+
+            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = i.Position - resizeStartMouse
+
+                local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
+                local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
+
+                local changeX = newWidth - resizeStartSize.X.Offset
+                local changeY = newHeight - resizeStartSize.Y.Offset
+
+                local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
+                local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
+
+                WindowFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+                WindowFrame.Position = UDim2.new(resizeStartPos.X.Scale, posX, resizeStartPos.Y.Scale, posY)
+                originalSize = WindowFrame.Size
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            activeResize = false
+            activeCorner = nil
+        end
+    end)
+
+    local activeTabBtn = nil
+    local tabCount = 0 -- Keeps track of custom tab creation order
+
+    -- =====================================================================
+    -- Window Object
+    -- =====================================================================
+    local Window = {}
+
+    function Window:CreateTab(name, layoutOrder)
+        tabCount = tabCount + 1
+
+        -- Sidebar Button
+        local Btn = Instance.new("TextButton")
+        Btn.Name                   = name .. "_Tab"
+        Btn.Size                   = UDim2.new(1, 0, 0, 33)
+        Btn.BackgroundColor3       = Color3.fromRGB(20, 20, 24)
+        Btn.BackgroundTransparency = 1
+        Btn.BorderSizePixel        = 0
+        Btn.Text                   = "  " .. name
+        Btn.TextColor3             = Color3.fromRGB(130, 130, 138)
+        Btn.TextSize               = 12
+        Btn.Font                   = Enum.Font.GothamMedium
+        Btn.TextXAlignment         = Enum.TextXAlignment.Left
+        Btn.ZIndex                 = 4
+        Btn.LayoutOrder            = layoutOrder or tabCount -- High custom priority defaults or standard auto-incremental ordering
+        Btn.Parent                 = TabContainer
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+
+        local Accent = Instance.new("Frame")
+        Accent.Size                   = UDim2.new(0, 3, 0, 15)
+        Accent.Position               = UDim2.new(0, 0, 0.5, -7)
+        Accent.BackgroundColor3       = Color3.fromRGB(255, 50, 50)
+        Accent.BorderSizePixel        = 0
+        Accent.BackgroundTransparency = 1
+        Accent.ZIndex                 = 5
+        Accent.Parent                 = Btn
+
+        -- Maintain aesthetic accent matching
+        task.spawn(function()
+            while ScreenGui.Parent do
+                if UISettings.RGBOutline then
+                    Accent.BackgroundColor3 = RGBStroke.Color
+                else
+                    Accent.BackgroundColor3 = UISettings.OutlineColor
+                end
+                task.wait(0.1)
+            end
+        end)
+
+        -- Scrollable Pages
+        local Page = Instance.new("ScrollingFrame")
+        Page.Name                   = name .. "_Page"
+        Page.Size                   = UDim2.new(1, 0, 1, 0)
+        Page.BackgroundTransparency = 1
+        Page.BorderSizePixel        = 0
+        Page.Visible                = false
+        Page.ScrollBarThickness     = 4
+        Page.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
+        Page.ZIndex                 = 4
+        Page.Active                 = true
+        Page.ScrollingDirection     = Enum.ScrollingDirection.Y
+        Page.CanvasSize             = UDim2.new(0, 0, 0, 0)
+        Page.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+        Page.Parent                 = PageContainer
+
+        local PageLayout = Instance.new("UIListLayout")
+        PageLayout.Padding   = UDim.new(0, 7)
+        PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        PageLayout.Parent    = Page
+
+        local PagePad = Instance.new("UIPadding")
+        PagePad.PaddingTop    = UDim.new(0, 7)
+        PagePad.PaddingBottom = UDim.new(0, 15)
+        PagePad.PaddingLeft   = UDim.new(0, 4)
+        PagePad.PaddingRight  = UDim.new(0, 8)
+        PagePad.Parent        = Page
+
+        PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 25)
+        end)
+
+        -- Tab click logic
+        Btn.MouseButton1Click:Connect(function()
+            if activeTabBtn == Btn then return end
+            for _, child in ipairs(TabContainer:GetChildren()) do
+                if child:IsA("TextButton") then
+                    TweenService:Create(child, TweenInfo.new(0.18), {
+                        TextColor3             = Color3.fromRGB(130, 130, 138),
+                        BackgroundTransparency = 1
+                    }):Play()
+                    local acc = child:FindFirstChildOfClass("Frame")
+                    if acc then
+                        TweenService:Create(acc, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+                    end
+                end
+            end
+            for _, pg in ipairs(PageContainer:GetChildren()) do
+                if pg:IsA("ScrollingFrame") then pg.Visible = false end
+            end
+            activeTabBtn = Btn
+            Page.Visible = true
+            TweenService:Create(Btn, TweenInfo.new(0.18), {
+                TextColor3             = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 0.45
+            }):Play()
+            TweenService:Create(Accent, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
+        end)
+
+        -- Auto-select first loaded tab ONLY if it is not UI Settings
+        if not activeTabBtn and name ~= "UI Settings" then
+            activeTabBtn = Btn
+            Page.Visible = true
+            Btn.TextColor3             = Color3.fromRGB(255, 255, 255)
+            Btn.BackgroundTransparency = 0.45
+            Accent.BackgroundTransparency = 0
+        end
+
+        -- =====================================================================
+        -- Tab Object Elements
+        -- =====================================================================
+        local Tab = {}
+
+        function Tab:CreateSection(text)
+            local f = Instance.new("Frame")
+            f.Size                   = UDim2.new(1, 0, 0, 22)
+            f.BackgroundTransparency = 1
+            f.ZIndex                 = 5
+            f.Parent                 = Page
+
+            local line = Instance.new("Frame")
+            line.Size             = UDim2.new(1, -8, 0, 1)
+            line.Position         = UDim2.new(0, 4, 0.5, 0)
+            line.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+            line.BorderSizePixel  = 0
+            line.ZIndex           = 5
+            line.Parent           = f
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size                   = UDim2.new(0, 0, 1, 0)
+            lbl.AutomaticSize          = Enum.AutomaticSize.X
+            lbl.Position               = UDim2.new(0, 8, 0, 0)
+            lbl.BackgroundColor3       = Color3.fromRGB(10, 10, 12)
+            lbl.BackgroundTransparency = 0
+            lbl.Text                   = "  " .. text .. "  "
+            lbl.TextColor3             = Color3.fromRGB(255, 50, 50)
+            lbl.TextSize               = 10
+            lbl.Font                   = Enum.Font.GothamBold
+            lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            lbl.ZIndex                 = 6
+            lbl.Parent                 = f
+        end
+
+        function Tab:CreateLabel(text)
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size                   = UDim2.new(1, 0, 0, 20)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text                   = text
+            Lbl.TextColor3             = Color3.fromRGB(110, 110, 118)
+            Lbl.TextSize               = 11
+            Lbl.Font                   = Enum.Font.GothamMedium
+            Lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            Lbl.TextWrapped            = true
+            Lbl.ZIndex                 = 5
+            Lbl.Parent                 = Page
+            return { Set = function(_, t) Lbl.Text = t end }
+        end
+
+        function Tab:CreateToggle(config)
+            config = config or {}
+            local text     = config.Name     or "Toggle"
+            local default  = config.Default  or config.CurrentValue or false
+            local callback = config.Callback or function() end
+
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 38)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size                   = UDim2.new(1, -70, 1, 0)
+            Lbl.Position               = UDim2.new(0, 12, 0, 0)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text                   = text
+            Lbl.TextColor3             = Color3.fromRGB(215, 215, 222)
+            Lbl.TextSize               = 12
+            Lbl.Font                   = Enum.Font.GothamMedium
+            Lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            Lbl.ZIndex                 = 6
+            Lbl.Parent                 = Row
+
+            local Track = Instance.new("TextButton")
+            Track.Size             = UDim2.new(0, 44, 0, 22)
+            Track.Position         = UDim2.new(1, -54, 0.5, -11)
+            Track.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+            Track.Text             = ""
+            Track.BorderSizePixel  = 0
+            Track.ZIndex           = 6
+            Track.Parent           = Row
+            Instance.new("UICorner", Track).CornerRadius = UDim.new(0, 11)
+
+            local Knob = Instance.new("Frame")
+            Knob.Size             = UDim2.new(0, 16, 0, 16)
+            Knob.Position         = UDim2.new(0, 3, 0.5, -8)
+            Knob.BackgroundColor3 = Color3.fromRGB(140, 140, 148)
+            Knob.BorderSizePixel  = 0
+            Knob.ZIndex           = 7
+            Knob.Parent           = Track
+            Instance.new("UICorner", Knob).CornerRadius = UDim.new(0, 8)
+
+            local state = false
+            local function apply(v)
+                state = v
+                TweenService:Create(Knob, TweenInfo.new(0.18), {
+                    Position         = v and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8),
+                    BackgroundColor3 = v and Color3.fromRGB(255,255,255) or Color3.fromRGB(140,140,148)
+                }):Play()
+                TweenService:Create(Track, TweenInfo.new(0.18), {
+                    BackgroundColor3 = v and Color3.fromRGB(220,45,45) or Color3.fromRGB(32,32,38)
+                }):Play()
+                callback(v)
+            end
+
+            if default then apply(true) end
+            Track.MouseButton1Click:Connect(function() apply(not state) end)
+            return { Set = apply, Get = function() return state end }
+        end
+
+        function Tab:CreateSlider(config)
+            config = config or {}
+            local text      = config.Name         or "Slider"
+            local min       = config.Min          or config.Range and config.Range[1] or 0
+            local max       = config.Max          or config.Range and config.Range[2] or 100
+            local default   = config.CurrentValue or config.Default or min
+            local increment = config.Increment    or 1
+            local suffix    = config.ValueName    or config.Suffix or ""
+            local callback  = config.Callback     or function() end
+
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 50)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size                   = UDim2.new(0.65, 0, 0, 22)
+            Lbl.Position               = UDim2.new(0, 12, 0, 6)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text                   = text
+            Lbl.TextColor3             = Color3.fromRGB(215, 215, 222)
+            Lbl.TextSize               = 12
+            Lbl.Font                   = Enum.Font.GothamMedium
+            Lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            Lbl.ZIndex                 = 6
+            Lbl.Parent                 = Row
+
+            local ValLbl = Instance.new("TextLabel")
+            ValLbl.Size                   = UDim2.new(0.35, -12, 0, 22)
+            ValLbl.Position               = UDim2.new(0.65, 0, 0, 6)
+            ValLbl.BackgroundTransparency = 1
+            ValLbl.Text                   = tostring(default) .. (suffix ~= "" and (" " .. suffix) or "")
+            ValLbl.TextColor3             = Color3.fromRGB(255, 50, 50)
+            ValLbl.TextSize               = 12
+            ValLbl.Font                   = Enum.Font.GothamBold
+            ValLbl.TextXAlignment         = Enum.TextXAlignment.Right
+            ValLbl.ZIndex                 = 6
+            ValLbl.Parent                 = Row
+
+            local Track = Instance.new("TextButton")
+            Track.Size             = UDim2.new(1, -24, 0, 5)
+            Track.Position         = UDim2.new(0, 12, 0, 36)
+            Track.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+            Track.Text             = ""
+            Track.BorderSizePixel  = 0
+            Track.ZIndex           = 6
+            Track.Parent           = Row
+            Instance.new("UICorner", Track).CornerRadius = UDim.new(0, 3)
+
+            local Fill = Instance.new("Frame")
+            Fill.Size             = UDim2.new((default-min)/(max-min), 0, 1, 0)
+            Fill.BackgroundColor3 = Color3.fromRGB(220, 45, 45)
+            Fill.BorderSizePixel  = 0
+            Fill.ZIndex           = 7
+            Fill.Parent           = Track
+            Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 3)
+
+            local draggingSlider = false
+            local function update(x)
+                local pct = math.clamp((x - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                local val = math.clamp(math.round((min + pct*(max-min)) / increment) * increment, min, max)
+                Fill.Size    = UDim2.new((val-min)/(max-min), 0, 1, 0)
+                ValLbl.Text  = (increment < 1 and string.format("%.1f", val) or tostring(math.round(val)))
+                              .. (suffix ~= "" and (" " .. suffix) or "")
+                callback(val)
+            end
+
+            Track.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1
+                or i.UserInputType == Enum.UserInputType.Touch then
+                    draggingSlider = true; update(i.Position.X)
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(i)
+                if draggingSlider and (i.UserInputType == Enum.UserInputType.MouseMovement
+                or i.UserInputType == Enum.UserInputType.Touch) then update(i.Position.X) end
+            end)
+            UserInputService.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1
+                or i.UserInputType == Enum.UserInputType.Touch then draggingSlider = false end
+            end)
+        end
+
+        function Tab:CreateButton(config)
+            config = config or {}
+            local text     = config.Name     or "Button"
+            local callback = config.Callback or function() end
+
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 38)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
+            local Btn = Instance.new("TextButton")
+            Btn.Size             = UDim2.new(1, -24, 0, 26)
+            Btn.Position         = UDim2.new(0, 12, 0.5, -13)
+            Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+            Btn.Text             = text
+            Btn.TextColor3       = Color3.fromRGB(235, 235, 242)
+            Btn.TextSize         = 11
+            Btn.Font             = Enum.Font.GothamBold
+            Btn.BorderSizePixel  = 0
+            Btn.ZIndex           = 6
+            Btn.Parent           = Row
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+
+            local Stroke = Instance.new("UIStroke", Btn)
+            Stroke.Thickness = 1
+            Stroke.Color     = Color3.fromRGB(38, 38, 46)
+
+            Btn.MouseEnter:Connect(function()
+                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(30,30,40)}):Play()
+            end)
+            Btn.MouseLeave:Connect(function()
+                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25,25,32)}):Play()
+            end)
+            Btn.MouseButton1Click:Connect(function()
+                TweenService:Create(Btn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(180,40,40)}):Play()
+                task.wait(0.12)
+                TweenService:Create(Btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25,25,32)}):Play()
+                callback()
+            end)
+        end
+
+        function Tab:CreateTextBox(config)
+            config = config or {}
+            local placeholder = config.Name        or config.PlaceholderText or "Enter text..."
+            local callback    = config.Callback    or function() end
+
+            local Row = Instance.new("Frame")
+            Row.Size             = UDim2.new(1, 0, 0, 38)
+            Row.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Row.BorderSizePixel  = 0
+            Row.ZIndex           = 5
+            Row.Parent           = Page
+            Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
+
+            local TB = Instance.new("TextBox")
+            TB.Size               = UDim2.new(0, 138, 0, 26)
+            TB.Position           = UDim2.new(1, -148, 0.5, -13)
+            TB.BackgroundColor3   = Color3.fromRGB(14, 14, 18)
+            TB.PlaceholderText    = placeholder
+            TB.Text               = ""
+            TB.TextColor3         = Color3.fromRGB(255, 255, 255)
+            TB.PlaceholderColor3  = Color3.fromRGB(90, 90, 98)
+            TB.TextSize           = 11
+            TB.Font               = Enum.Font.GothamMedium
+            TB.BorderSizePixel    = 0
+            TB.ClearTextOnFocus   = false
+            TB.ZIndex             = 6
+            TB.Parent             = Row
+            Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 6)
+
+            local Stroke = Instance.new("UIStroke", TB)
+            Stroke.Thickness = 1
+            Stroke.Color     = Color3.fromRGB(34, 34, 42)
+
+            TB.Focused:Connect(function()
+                TweenService:Create(Stroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(220,45,45)}):Play()
+            end)
+            TB.FocusLost:Connect(function()
+                TweenService:Create(Stroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(34,34,42)}):Play()
+                if TB.Text ~= "" then callback(TB.Text) end
+            end)
+        end
+
+        function Tab:CreateDropdown(config)
+            config = config or {}
+            local text     = config.Name     or "Dropdown"
+            local list     = config.Options  or {}
+            local callback = config.Callback or function() end
+
+            local Wrapper = Instance.new("Frame")
+            Wrapper.Size             = UDim2.new(1, 0, 0, 38)
+            Wrapper.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            Wrapper.BorderSizePixel  = 0
+            Wrapper.ZIndex           = 15
+            Wrapper.ClipsDescendants = false
+            Wrapper.Parent           = Page
+            Instance.new("UICorner", Wrapper).CornerRadius = UDim.new(0, 7)
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size                   = UDim2.new(0.5, 0, 1, 0)
+            Lbl.Position               = UDim2.new(0, 12, 0, 0)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text                   = text
+            Lbl.TextColor3             = Color3.fromRGB(215, 215, 222)
+            Lbl.TextSize               = 12
+            Lbl.Font                   = Enum.Font.GothamMedium
+            Lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            Lbl.ZIndex                 = 16
+            Lbl.Parent                 = Wrapper
+
+            local SelBtn = Instance.new("TextButton")
+            SelBtn.Size             = UDim2.new(0, 138, 0, 26)
+            SelBtn.Position         = UDim2.new(1, -148, 0.5, -13)
+            SelBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+            SelBtn.Text             = list[1] or "Select"
+            SelBtn.TextColor3       = Color3.fromRGB(235, 235, 242)
+            SelBtn.TextSize         = 11
+            SelBtn.Font             = Enum.Font.GothamBold
+            SelBtn.BorderSizePixel  = 0
+            SelBtn.ZIndex           = 17
+            SelBtn.Parent           = Wrapper
+            Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
+
+            local DropFrame = Instance.new("ScrollingFrame")
+            DropFrame.Size                   = UDim2.new(1, 0, 0, math.clamp(#list * 28, 0, 140))
+            DropFrame.Position               = UDim2.new(0, 0, 1, 3)
+            DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
+            DropFrame.BorderSizePixel        = 0
+            DropFrame.Visible                = false
+            DropFrame.ZIndex                 = 50
+            DropFrame.ScrollBarThickness     = 3
+            DropFrame.ScrollBarImageColor3   = Color3.fromRGB(255, 50, 50)
+            DropFrame.ScrollingDirection     = Enum.ScrollingDirection.Y
+            DropFrame.Active                 = true
+            DropFrame.CanvasSize             = UDim2.new(0, 0, 0, #list * 28)
+            DropFrame.Parent                 = Wrapper
+            Instance.new("UICorner", DropFrame).CornerRadius = UDim.new(0, 6)
+
+            local DStroke = Instance.new("UIStroke", DropFrame)
+            DStroke.Thickness = 1
+            DStroke.Color     = Color3.fromRGB(40, 40, 50)
+
+            local DropLayout = Instance.new("UIListLayout", DropFrame)
+            DropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local open = false
+            SelBtn.MouseButton1Click:Connect(function()
+                open = not open
+                DropFrame.Visible = open
+            end)
+
+            local function createOptionButton(item)
+                local Opt = Instance.new("TextButton")
+                Opt.Size                   = UDim2.new(1, -6, 0, 28)
+                Opt.BackgroundTransparency = 1
+                Opt.Text                   = item
+                Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
+                Opt.TextSize               = 11
+                Opt.Font                   = Enum.Font.GothamMedium
+                Opt.ZIndex                 = 51
+                Opt.Parent                 = DropFrame
+
+                Opt.MouseEnter:Connect(function()
+                    TweenService:Create(Opt, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+                end)
+                Opt.MouseLeave:Connect(function()
+                    TweenService:Create(Opt, TweenInfo.new(0.1), {TextColor3 = Color3.fromRGB(180,180,188)}):Play()
+                end)
+                Opt.MouseButton1Click:Connect(function()
+                    open = false
+                    DropFrame.Visible = false
+                    SelBtn.Text = item
+                    callback(item)
+                end)
+            end
+
+            for _, item in ipairs(list) do
+                createOptionButton(item)
+            end
+
+            return {
+                Get = function() 
+                    return SelBtn.Text 
+                end,
+                Refresh = function(self, newList)
+                    newList = newList or {}
+                    for _, child in ipairs(DropFrame:GetChildren()) do
+                        if child:IsA("TextButton") then
+                            child:Destroy()
+                        end
+                    end
+                    DropFrame.Size = UDim2.new(1, 0, 0, math.clamp(#newList * 28, 0, 140))
+                    DropFrame.CanvasSize = UDim2.new(0, 0, 0, #newList * 28)
+                    for _, item in ipairs(newList) do
+                        createOptionButton(item)
+                    end
+                    local found = false
+                    for _, item in ipairs(newList) do
+                        if item == SelBtn.Text then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        SelBtn.Text = newList[1] or "Select"
+                    end
+                end
             }
-        })
-    end,
-})
-
--- Banner & Gacha Automation
-AutoTab:CreateSection("Banner Summon Automation")
-
-AutoTab:CreateToggle({
-    Name = "Auto Summon Banner",
-    Default = false,
-    Callback = function(Value)
-        AutoSummonEnabled = Value
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Summon Amount",
-    Min = 1,
-    Max = 10,
-    Default = 1,
-    Callback = function(Value)
-        SelectedSummonAmount = Value
-    end,
-})
-
-AutoTab:CreateDropdown({
-    Name = "Summon Mode",
-    Options = {"Normal", "Special"},
-    Default = "Normal",
-    Callback = function(Option)
-        SelectedSummonType = Option
-    end,
-})
-
-AutoTab:CreateSlider({
-    Name = "Auto Summon Delay",
-    Min = 0.1,
-    Max = 5,
-    Default = 0.5,
-    Callback = function(Value)
-        AutoSummonInterval = Value
-    end,
-})
-
-AutoTab:CreateSection("Roll Configuration")
-
-AutoTab:CreateDropdown({
-    Name = "Roll Mode",
-    Options = {"single", "multi"},
-    Default = "single",
-    Callback = function(Option)
-        SelectedRollMode = Option
-    end,
-})
-
-AutoTab:CreateTextBox({
-    Name = "Banner Name",
-    PlaceholderText = "skylands",
-    Callback = function(Text)
-        if Text and Text ~= "" then
-            SelectedBanner = Text
         end
-    end,
-})
 
-AutoTab:CreateSection("Gacha Automation")
+        -- =====================================================================
+        -- [[ DYNAMIC ROTATABLE COLOR WHEEL ELEMENT ]] --
+        -- =====================================================================
+        function Tab:CreateColorPicker(config)
+            config = config or {}
+            local name = config.Name or "Color Picker"
+            local defaultColor = config.Default or Color3.fromRGB(255, 50, 50)
+            local callback = config.Callback or function() end
 
-AutoTab:CreateToggle({
-    Name = "Auto Roll Champion",
-    Default = false,
-    Callback = function(Value)
-        AutoRollEnabled = Value
-    end,
-})
+            local PickerRow = Instance.new("Frame")
+            PickerRow.Size = UDim2.new(1, 0, 0, 140)
+            PickerRow.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+            PickerRow.BorderSizePixel = 0
+            PickerRow.ZIndex = 5
+            PickerRow.Parent = Page
+            Instance.new("UICorner", PickerRow).CornerRadius = UDim.new(0, 7)
 
--- Rewards Automation
-AutoTab:CreateSection("Auto Claim")
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(0.4, 0, 0, 30)
+            Label.Position = UDim2.new(0, 12, 0, 10)
+            Label.BackgroundTransparency = 1
+            Label.Text = name
+            Label.TextColor3 = Color3.fromRGB(215, 215, 222)
+            Label.TextSize = 12
+            Label.Font = Enum.Font.GothamMedium
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.ZIndex = 6
+            Label.Parent = PickerRow
 
-AutoTab:CreateToggle({
-    Name = "Auto Claim All Rewards",
-    Default = false,
-    Callback = function(Value)
-        AutoClaimEnabled = Value
-    end,
-})
+            -- Current Color Indicator Box
+            local ColorPreview = Instance.new("Frame")
+            ColorPreview.Size = UDim2.new(0, 50, 0, 20)
+            ColorPreview.Position = UDim2.new(0, 12, 0, 45)
+            ColorPreview.BackgroundColor3 = defaultColor
+            ColorPreview.BorderSizePixel = 0
+            ColorPreview.ZIndex = 6
+            ColorPreview.Parent = PickerRow
+            Instance.new("UICorner", ColorPreview).CornerRadius = UDim.new(0, 4)
+
+            local PreviewStroke = Instance.new("UIStroke", ColorPreview)
+            PreviewStroke.Color = Color3.fromRGB(45, 45, 55)
+            PreviewStroke.Thickness = 1
+
+            -- Color Wheel Image (Radial HSV Color Map Asset)
+            local Wheel = Instance.new("ImageButton")
+            Wheel.Size = UDim2.new(0, 100, 0, 100)
+            Wheel.Position = UDim2.new(1, -240, 0.5, -50)
+            Wheel.BackgroundTransparency = 1
+            Wheel.Image = "rbxassetid://415583266" -- Default High-Res Color Wheel asset
+            Wheel.ZIndex = 7
+            Wheel.Parent = PickerRow
+
+            -- Cursor Selection Pin
+            local WheelPin = Instance.new("Frame")
+            WheelPin.Size = UDim2.new(0, 8, 0, 8)
+            WheelPin.AnchorPoint = Vector2.new(0.5, 0.5)
+            WheelPin.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            WheelPin.BorderSizePixel = 0
+            WheelPin.ZIndex = 8
+            WheelPin.Parent = Wheel
+            Instance.new("UICorner", WheelPin).CornerRadius = UDim.new(1, 0)
+            Instance.new("UIStroke", WheelPin).Color = Color3.fromRGB(0, 0, 0)
+
+            -- Saturation / Value Vertical Slider Bar
+            local ValSlider = Instance.new("TextButton")
+            ValSlider.Size = UDim2.new(0, 15, 0, 100)
+            ValSlider.Position = UDim2.new(1, -110, 0.5, -50)
+            ValSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            ValSlider.BorderSizePixel = 0
+            ValSlider.Text = ""
+            ValSlider.ZIndex = 7
+            ValSlider.Parent = PickerRow
+            Instance.new("UICorner", ValSlider).CornerRadius = UDim.new(0, 4)
+
+            local ValGradient = Instance.new("UIGradient")
+            ValGradient.Rotation = 90
+            ValGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            })
+            ValGradient.Parent = ValSlider
+
+            local ValPin = Instance.new("Frame")
+            ValPin.Size = UDim2.new(1, 4, 0, 4)
+            ValPin.Position = UDim2.new(0, -2, 0, 0)
+            ValPin.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            ValPin.BorderSizePixel = 0
+            ValPin.ZIndex = 8
+            ValPin.Parent = ValSlider
+            Instance.new("UIStroke", ValPin).Color = Color3.fromRGB(0, 0, 0)
+
+            -- Internal State
+            local currentH, currentS, currentV = defaultColor:ToHSV()
+            local pickingWheel = false
+            local pickingVal = false
+
+            local function updateColor()
+                local finalColor = Color3.fromHSV(currentH, currentS, currentV)
+                ColorPreview.BackgroundColor3 = finalColor
+                ValGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(currentH, currentS, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+          ... (7 KB left)
