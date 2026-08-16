@@ -848,7 +848,7 @@ function DaleyUI:CreateWindow(config)
 
         function Tab:CreateTextBox(config)
             config = config or {}
-            local placeholder = config.Name        or config.PlaceholderText or "Enter text..."
+            local placeholder = config.Name or config.PlaceholderText or "Enter text..."
             local callback    = config.Callback    or function() end
 
             local Row = Instance.new("Frame")
@@ -859,18 +859,30 @@ function DaleyUI:CreateWindow(config)
             Row.Parent           = Page
             Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 7)
 
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size                   = UDim2.new(1, -165, 1, 0)
+            Lbl.Position               = UDim2.new(0, 12, 0, 0)
+            Lbl.BackgroundTransparency = 1
+            Lbl.Text                   = config.Name or "Input"
+            Lbl.TextColor3             = Color3.fromRGB(215, 215, 222)
+            Lbl.TextSize               = 12
+            Lbl.Font                   = Enum.Font.GothamMedium
+            Lbl.TextXAlignment         = Enum.TextXAlignment.Left
+            Lbl.ZIndex                 = 6
+            Lbl.Parent                 = Row
+
             local TB = Instance.new("TextBox")
             TB.Size               = UDim2.new(0, 138, 0, 26)
             TB.Position           = UDim2.new(1, -148, 0.5, -13)
             TB.BackgroundColor3   = Color3.fromRGB(14, 14, 18)
             TB.PlaceholderText    = placeholder
-            TB.Text               = ""
+            TB.Text               = config.Default or ""
             TB.TextColor3         = Color3.fromRGB(255, 255, 255)
             TB.PlaceholderColor3  = Color3.fromRGB(90, 90, 98)
             TB.TextSize           = 11
             TB.Font               = Enum.Font.GothamMedium
             TB.BorderSizePixel    = 0
-            TB.ClearTextOnFocus   = false
+            TB.ClearTextOnFocus   = config.RemoveTextAfterFocusLost or false
             TB.ZIndex             = 6
             TB.Parent             = Row
             Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 6)
@@ -884,9 +896,12 @@ function DaleyUI:CreateWindow(config)
             end)
             TB.FocusLost:Connect(function()
                 TweenService:Create(Stroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(34,34,42)}):Play()
-                if TB.Text ~= "" then callback(TB.Text) end
+                callback(TB.Text)
             end)
         end
+
+        -- Alias for CreateTextBox so scripts calling CreateInput do not break
+        Tab.CreateInput = Tab.CreateTextBox
 
         function Tab:CreateDropdown(config)
             config = config or {}
