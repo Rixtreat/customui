@@ -1097,4 +1097,26 @@ function DaleyUI:CreateWindow(config)
                 local finalColor = Color3.fromHSV(currentH, currentS, currentV)
                 ColorPreview.BackgroundColor3 = finalColor
                 ValGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV(current... (7 KB left)
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(currentH, currentS, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+                })
+                callback(finalColor)
+            end
+
+            -- Place initial pins based on default color HSV calculations
+            local function updatePins()
+                local r = currentS * 50
+                local angle = currentH * (math.pi * 2)
+                WheelPin.Position = UDim2.new(0, 50 + math.cos(angle) * r, 0, 50 - math.sin(angle) * r)
+                ValPin.Position = UDim2.new(0, -2, 1 - currentV, -2)
+            end
+
+            -- Update HSV based on selection position within the Color Wheel circle boundary
+            local function processWheel(x, y)
+                local rPos = Vector2.new(x - Wheel.AbsolutePosition.X - 50, y - Wheel.AbsolutePosition.Y - 50)
+                local dist = math.clamp(rPos.Magnitude, 0, 50)
+                local angle = math.atan2(-rPos.Y, rPos.X)
+                if angle < 0 then angle = angle + (math.pi * 2) end
+                
+                currentH = angle / (math.pi * 2)
+                currentS = dis... (5 KB left)
