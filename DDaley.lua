@@ -53,7 +53,7 @@ local UISettings = {
 function DaleyUI:CreateWindow(config)
     config = config or {}
     local windowName  = config.Name     or "Daley Hub"
-    
+
     -- Force-resolve a strict string fallback immediately so clipboard never fails
     local rawDiscord = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
     local discordLink = tostring(rawDiscord)
@@ -127,10 +127,10 @@ function DaleyUI:CreateWindow(config)
 
     RunService.RenderStepped:Connect(function(dt)
         if not ScreenGui.Parent then return end
-        
+
         -- Instantly toggle visual container visibility based on global setting
         StarContainer.Visible = UISettings.StarsEnabled
-        
+
         if UISettings.StarsEnabled then
             for _, sd in ipairs(stars) do
                 local nx = sd.f.Position.X.Scale - sd.spd * dt
@@ -261,7 +261,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = true
         DiscBtn.Text = "Copied!"
         TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
-        
+
         pcall(function()
             if setclipboard then setclipboard(discordLink)
             elseif toclipboard then toclipboard(discordLink)
@@ -271,7 +271,7 @@ function DaleyUI:CreateWindow(config)
             elseif fluxus and fluxus.set_clipboard then fluxus.set_clipboard(discordLink)
             end
         end)
-        
+
         task.wait(2)
         DiscBtn.Text = "Join Discord"
         TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
@@ -287,7 +287,7 @@ function DaleyUI:CreateWindow(config)
             startPos  = WindowFrame.Position
         end
     end)
-    
+
     UserInputService.InputChanged:Connect(function(i)
         if dragging then
             -- Fallback verification using custom state tracker (Fixes sticking)
@@ -304,7 +304,7 @@ function DaleyUI:CreateWindow(config)
             end
         end
     end)
-    
+
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
@@ -441,16 +441,16 @@ function DaleyUI:CreateWindow(config)
                 activeCorner = nil
                 return
             end
-            
+
             if i.UserInputType == Enum.UserInputType.MouseMovement then
                 local delta = i.Position - resizeStartMouse
-                
+
                 local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
                 local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
-                
+
                 local changeX = newWidth - resizeStartSize.X.Offset
                 local changeY = newHeight - resizeStartSize.Y.Offset
-                
+
                 local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
                 local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
 
@@ -1117,6 +1117,152 @@ function DaleyUI:CreateWindow(config)
                 local dist = math.clamp(rPos.Magnitude, 0, 50)
                 local angle = math.atan2(-rPos.Y, rPos.X)
                 if angle < 0 then angle = angle + (math.pi * 2) end
-                
+
                 currentH = angle / (math.pi * 2)
-                currentS = dis... (5 KB left)
+                currentS = dist / 50
+                WheelPin.Position = UDim2.new(0, 50 + math.cos(angle) * dist, 0, 50 - math.sin(angle) * dist)
+                updateColor()
+            end
+
+            local function processSlider(y)
+                local pct = math.clamp((y - ValSlider.AbsolutePosition.Y) / ValSlider.AbsoluteSize.Y, 0, 1)
+                currentV = 1 - pct
+                ValPin.Position = UDim2.new(0, -2, pct, -2)
+                updateColor()
+            end
+
+            -- Input Listeners
+            Wheel.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingWheel = true
+                    processWheel(i.Position.X, i.Position.Y)
+                end
+            end)
+
+            ValSlider.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingVal = true
+                    processSlider(i.Position.Y)
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+                    if pickingWheel then
+                        processWheel(i.Position.X, i.Position.Y)
+                    elseif pickingVal then
+                        processSlider(i.Position.Y)
+                    end
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                    pickingWheel = false
+                    pickingVal = false
+                end
+            end)
+
+            updatePins()
+            updateColor()
+
+            return {
+                SetColor = function(color)
+                    currentH, currentS, currentV = color:ToHSV()
+                    updatePins()
+                    updateColor()
+                end
+            }
+        end
+
+        return Tab
+    end
+
+    -- =========================================================================
+    -- [[ AUTOMATIC COMBINED "UI Settings" TAB GENERATION ]] --
+    -- Layout Priority = 9999 ensures this is always at the absolute bottom.
+    -- =========================================================================
+    local MiscTab = Window:CreateTab("UI Settings", 9999)
+
+    -- Customization Settings Section
+    MiscTab:CreateSection("Customization Settings")
+
+    -- Toggle RGB Outline
+    MiscTab:CreateToggle({
+        Name = "RGB Outline Theme",
+        Default = UISettings.RGBOutline,
+        Callback = function(v)
+            UISettings.RGBOutline = v
+        end
+    })
+
+    -- Background Stars Toggle
+    MiscTab:CreateToggle({
+        Name = "Background Starfield",
+        Default = UISettings.StarsEnabled,
+        Callback = function(v)
+            UISettings.StarsEnabled = v
+        end
+    })
+
+    -- ========== ANTI-AFK TOGGLE (ADDED) ==========
+    local antiAFKRunning = false
+    local antiAFKTask = nil
+
+    MiscTab:CreateToggle({
+        Name = "Enable Anti-AFK",
+        Default = false,
+        Callback = function(v)
+            antiAFKRunning = v
+            if v then
+                if antiAFKTask then task.cancel(antiAFKTask) end
+                antiAFKTask = task.spawn(function()
+                    while antiAFKRunning and ScreenGui.Parent do
+                        pcall(function()
+                            local vu = game:GetService("VirtualUser")
+                            vu:CaptureController()
+                            vu:ClickButton2(Vector2.new())
+                        end)
+                        task.wait(60) -- Adjust interval if needed
+                    end
+                end)
+            else
+                if antiAFKTask then
+                    task.cancel(antiAFKTask)
+                    antiAFKTask = nil
+                end
+            end
+        end
+    })
+    -- =============================================
+
+    -- Interactive Color Wheel for Theme Color selection (Replaced custom typing)
+    MiscTab:CreateColorPicker({
+        Name = "Theme Outline Color Picker",
+        Default = UISettings.OutlineColor,
+        Callback = function(color)
+            UISettings.OutlineColor = color
+        end
+    })
+
+    -- Control Settings Section
+    MiscTab:CreateSection("Control Settings")
+
+    -- Keybind Change Configuration Box
+    MiscTab:CreateTextBox({
+        Name = "Change UI Toggle Key (e.g. K, P, L)",
+        Callback = function(val)
+            local targetKey = string.upper(val:sub(1,1))
+            pcall(function()
+                local newCode = Enum.KeyCode[targetKey]
+                if newCode then
+                    UISettings.ToggleKey = newCode
+                end
+            end)
+        end
+    })
+
+    return Window
+end
+
+return DaleyUI
