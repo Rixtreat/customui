@@ -53,7 +53,7 @@ local UISettings = {
 function DaleyUI:CreateWindow(config)
     config = config or {}
     local windowName  = config.Name     or "Daley Hub"
-
+    
     -- Force-resolve a strict string fallback immediately so clipboard never fails
     local rawDiscord = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
     local discordLink = tostring(rawDiscord)
@@ -127,10 +127,10 @@ function DaleyUI:CreateWindow(config)
 
     RunService.RenderStepped:Connect(function(dt)
         if not ScreenGui.Parent then return end
-
+        
         -- Instantly toggle visual container visibility based on global setting
         StarContainer.Visible = UISettings.StarsEnabled
-
+        
         if UISettings.StarsEnabled then
             for _, sd in ipairs(stars) do
                 local nx = sd.f.Position.X.Scale - sd.spd * dt
@@ -261,7 +261,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = true
         DiscBtn.Text = "Copied!"
         TweenService:Create(DiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(46, 204, 113)}):Play()
-
+        
         pcall(function()
             if setclipboard then setclipboard(discordLink)
             elseif toclipboard then toclipboard(discordLink)
@@ -271,7 +271,7 @@ function DaleyUI:CreateWindow(config)
             elseif fluxus and fluxus.set_clipboard then fluxus.set_clipboard(discordLink)
             end
         end)
-
+        
         task.wait(2)
         DiscBtn.Text = "Join Discord"
         TweenService:Create(DiscBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(88, 101, 242)}):Play()
@@ -287,7 +287,7 @@ function DaleyUI:CreateWindow(config)
             startPos  = WindowFrame.Position
         end
     end)
-
+    
     UserInputService.InputChanged:Connect(function(i)
         if dragging then
             -- Fallback verification using custom state tracker (Fixes sticking)
@@ -304,7 +304,7 @@ function DaleyUI:CreateWindow(config)
             end
         end
     end)
-
+    
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
@@ -441,16 +441,16 @@ function DaleyUI:CreateWindow(config)
                 activeCorner = nil
                 return
             end
-
+            
             if i.UserInputType == Enum.UserInputType.MouseMovement then
                 local delta = i.Position - resizeStartMouse
-
+                
                 local newWidth  = math.clamp(resizeStartSize.X.Offset + (delta.X * activeCorner.FactorX), 480, 950)
                 local newHeight = math.clamp(resizeStartSize.Y.Offset + (delta.Y * activeCorner.FactorY), 280, 650)
-
+                
                 local changeX = newWidth - resizeStartSize.X.Offset
                 local changeY = newHeight - resizeStartSize.Y.Offset
-
+                
                 local posX = resizeStartPos.X.Offset - (changeX * activeCorner.MoveX)
                 local posY = resizeStartPos.Y.Offset - (changeY * activeCorner.MoveY)
 
@@ -1117,7 +1117,7 @@ function DaleyUI:CreateWindow(config)
                 local dist = math.clamp(rPos.Magnitude, 0, 50)
                 local angle = math.atan2(-rPos.Y, rPos.X)
                 if angle < 0 then angle = angle + (math.pi * 2) end
-
+                
                 currentH = angle / (math.pi * 2)
                 currentS = dist / 50
                 WheelPin.Position = UDim2.new(0, 50 + math.cos(angle) * dist, 0, 50 - math.sin(angle) * dist)
