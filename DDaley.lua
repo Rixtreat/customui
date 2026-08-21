@@ -1,5 +1,5 @@
 -- =========================================================================
--- [[ DALEY UI LIBRARY - COLOR WHEEL, RESIZE, & COMBINED UI SETTINGS TAB ]] --
+-- [[ DALEY UI LIBRARY - FIXED PARAMETER HANDLING & COLOR WHEEL ]] --
 -- Host this file on GitHub and load it via:
 --   local DaleyUI = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 --   local Window = DaleyUI:CreateWindow({ Name = "My Hub", Discord = "YOUR_LINK" })
@@ -13,14 +13,14 @@ local CoreGui          = game:GetService("CoreGui")
 
 local LP = Players.LocalPlayer
 
--- SAFE TO USE UI PARENT (Completely avoids the nil gethui call error)
+-- SAFE TO USE UI PARENT
 local TargetParent = CoreGui or (LP and LP:WaitForChild("PlayerGui"))
 
 -- Global active dropdown tracker to close existing open menus
 local ActiveDropdownFrame = nil
 
 -- =========================================================================
--- [[ GLOBAL MOUSE STATE TRACKER (FIXES ENUM ERRORS) ]] --
+-- [[ GLOBAL MOUSE STATE TRACKER ]] --
 -- =========================================================================
 local isLeftMouseDown = false
 
@@ -42,7 +42,7 @@ end)
 local DaleyUI = {}
 DaleyUI.__index = DaleyUI
 
--- Global Settings Reference (Shared between Library, Windows, and UI Settings)
+-- Global Settings Reference
 local UISettings = {
     RGBOutline = true,
     OutlineColor = Color3.fromRGB(255, 50, 50),
@@ -54,11 +54,14 @@ local UISettings = {
 -- [[ CREATE WINDOW ]] --
 -- =========================================================================
 function DaleyUI:CreateWindow(config)
-    config = config or {}
-    local windowName  = config.Name     or "Daley Hub"
-    
-    -- Force-resolve a strict string fallback immediately so clipboard never fails
-    local rawDiscord = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
+    if typeof(config) == "string" then
+        config = { Name = config }
+    else
+        config = config or {}
+    end
+
+    local windowName  = config.Name or "Daley Hub"
+    local rawDiscord  = config.Discord or config.discord or "https://discord.gg/YaBAzdzh9m"
     local discordLink = tostring(rawDiscord)
 
     -- Cleanup existing
@@ -79,7 +82,7 @@ function DaleyUI:CreateWindow(config)
     WindowFrame.Size             = UDim2.new(0, 650, 0, 420)
     WindowFrame.Position         = UDim2.new(0.5, -325, 0.5, -210)
     WindowFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-    WindowFrame.BorderSizePixel  = 0
+    WindowFrame.BorderSizePixel = 0
     WindowFrame.ClipsDescendants = false
     WindowFrame.Active           = true
     WindowFrame.Parent           = ScreenGui
@@ -130,10 +133,7 @@ function DaleyUI:CreateWindow(config)
 
     RunService.RenderStepped:Connect(function(dt)
         if not ScreenGui.Parent then return end
-        
-        -- Instantly toggle visual container visibility based on global setting
         StarContainer.Visible = UISettings.StarsEnabled
-        
         if UISettings.StarsEnabled then
             for _, sd in ipairs(stars) do
                 local nx = sd.f.Position.X.Scale - sd.spd * dt
@@ -165,7 +165,6 @@ function DaleyUI:CreateWindow(config)
     Logo.ZIndex                 = 11
     Logo.Parent                 = Header
 
-    -- Dynamically match the Logo color to your outline theme color
     task.spawn(function()
         while ScreenGui.Parent do
             if UISettings.RGBOutline then
@@ -230,10 +229,10 @@ function DaleyUI:CreateWindow(config)
     MinBtn.BackgroundTransparency = 1
     MinBtn.Text                   = "—"
     MinBtn.TextColor3             = Color3.fromRGB(170, 170, 175)
-    MinBtn.TextSize         = 14
-    MinBtn.Font             = Enum.Font.GothamMedium
-    MinBtn.ZIndex           = 12
-    MinBtn.Parent           = CtrlFrame
+    MinBtn.TextSize               = 14
+    MinBtn.Font                   = Enum.Font.GothamMedium
+    MinBtn.ZIndex                 = 12
+    MinBtn.Parent                 = CtrlFrame
 
     local minimized    = false
     local originalSize = WindowFrame.Size
@@ -251,13 +250,12 @@ function DaleyUI:CreateWindow(config)
     DiscBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
     DiscBtn.TextSize         = 12
     DiscBtn.Font             = Enum.Font.GothamBold
-    DiscBtn.BorderSizePixel  = 0
+    DiscBtn.BorderSizePixel = 0
     DiscBtn.ZIndex           = 12
     DiscBtn.LayoutOrder      = 1
     DiscBtn.Parent           = HeaderRight
     Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 5)
 
-    -- Discord Clipboard
     local discDebounce = false
     DiscBtn.MouseButton1Click:Connect(function()
         if discDebounce then return end
@@ -281,7 +279,7 @@ function DaleyUI:CreateWindow(config)
         discDebounce = false
     end)
 
-    -- Drag System with Custom State Safeguard
+    -- Drag System
     local dragging, dragStart, startPos = false, nil, nil
     Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -311,7 +309,7 @@ function DaleyUI:CreateWindow(config)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 
-    -- Keybind Toggle with Scale Animation
+    -- Keybind Toggle
     local uiVisible = true
     local animating = false
 
@@ -396,7 +394,7 @@ function DaleyUI:CreateWindow(config)
     PageContainer.ZIndex                 = 3
     PageContainer.Parent                 = WindowFrame
 
-    -- Overlay Container for Dropdowns so they don't get clipped by Page Container
+    -- Overlay Container
     local OverlayContainer = Instance.new("Frame")
     OverlayContainer.Name                   = "OverlayContainer"
     OverlayContainer.Size                   = UDim2.new(1, 0, 1, 0)
@@ -405,7 +403,6 @@ function DaleyUI:CreateWindow(config)
     OverlayContainer.ClipsDescendants       = false
     OverlayContainer.Parent                 = WindowFrame
 
-    -- Close dropdowns when scrolling
     local function closeActiveDropdown()
         if ActiveDropdownFrame then
             ActiveDropdownFrame.Visible = false
@@ -413,9 +410,7 @@ function DaleyUI:CreateWindow(config)
         end
     end
 
-    -- =========================================================================
-    -- [[ TRANSPARENT 4-CORNER RESIZE HANDLERS ]] --
-    -- =========================================================================
+    -- Transparent Resize Handlers
     local resizeHandles = {
         BR = { Pos = UDim2.new(1, -16, 1, -16), Anchor = Vector2.new(0,0), FactorX = 1,  FactorY = 1,  MoveX = 0, MoveY = 0 },
         BL = { Pos = UDim2.new(0, 0, 1, -16),   Anchor = Vector2.new(0,0), FactorX = -1, FactorY = 1,  MoveX = 1, MoveY = 0 },
@@ -488,15 +483,11 @@ function DaleyUI:CreateWindow(config)
     local activeTabBtn = nil
     local tabCount = 0
 
-    -- =====================================================================
-    -- Window Object
-    -- =====================================================================
     local Window = {}
 
     function Window:CreateTab(name, layoutOrder)
         tabCount = tabCount + 1
 
-        -- Sidebar Button
         local Btn = Instance.new("TextButton")
         Btn.Name                   = name .. "_Tab"
         Btn.Size                   = UDim2.new(1, 0, 0, 33)
@@ -533,7 +524,6 @@ function DaleyUI:CreateWindow(config)
             end
         end)
 
-        -- Scrollable Pages
         local Page = Instance.new("ScrollingFrame")
         Page.Name                   = name .. "_Page"
         Page.Size                   = UDim2.new(1, 0, 1, 0)
@@ -603,12 +593,10 @@ function DaleyUI:CreateWindow(config)
             Accent.BackgroundTransparency = 0
         end
 
-        -- =====================================================================
-        -- Tab Object Elements
-        -- =====================================================================
         local Tab = {}
 
         function Tab:CreateSection(text)
+            text = typeof(text) == "table" and (text.Name or text.Title) or tostring(text or "Section")
             local f = Instance.new("Frame")
             f.Size                   = UDim2.new(1, 0, 0, 22)
             f.BackgroundTransparency = 1
@@ -639,6 +627,7 @@ function DaleyUI:CreateWindow(config)
         end
 
         function Tab:CreateLabel(text)
+            text = typeof(text) == "table" and (text.Name or text.Text) or tostring(text or "")
             local Lbl = Instance.new("TextLabel")
             Lbl.Size                   = UDim2.new(1, 0, 0, 20)
             Lbl.BackgroundTransparency = 1
@@ -653,10 +642,22 @@ function DaleyUI:CreateWindow(config)
             return { Set = function(_, t) Lbl.Text = t end }
         end
 
-        function Tab:CreateToggle(config)
-            config = config or {}
-            local text     = config.Name     or "Toggle"
-            local default  = config.Default  or config.CurrentValue or false
+        function Tab:CreateToggle(arg1, arg2, arg3)
+            local config = {}
+            if typeof(arg1) == "table" then
+                config = arg1
+            else
+                config.Name = arg1
+                if typeof(arg2) == "function" then
+                    config.Callback = arg2
+                else
+                    config.Default = arg2
+                    config.Callback = arg3
+                end
+            end
+
+            local text     = config.Name or config.Text or "Toggle"
+            local default  = config.Default or config.CurrentValue or false
             local callback = config.Callback or function() end
 
             local Row = Instance.new("Frame")
@@ -716,15 +717,29 @@ function DaleyUI:CreateWindow(config)
             return { Set = apply, Get = function() return state end }
         end
 
-        function Tab:CreateSlider(config)
-            config = config or {}
-            local text      = config.Name         or "Slider"
-            local min       = config.Min          or config.Range and config.Range[1] or 0
-            local max       = config.Max          or config.Range and config.Range[2] or 100
+        function Tab:CreateSlider(arg1, arg2, arg3, arg4, arg5)
+            local config = {}
+            if typeof(arg1) == "table" then
+                config = arg1
+            else
+                config.Name = arg1
+                config.Min = arg2
+                config.Max = arg3
+                if typeof(arg4) == "function" then
+                    config.Callback = arg4
+                else
+                    config.Default = arg4
+                    config.Callback = arg5
+                end
+            end
+
+            local text      = config.Name or "Slider"
+            local min       = config.Min or config.Range and config.Range[1] or 0
+            local max       = config.Max or config.Range and config.Range[2] or 100
             local default   = config.CurrentValue or config.Default or min
-            local increment = config.Increment    or 1
-            local suffix    = config.ValueName    or config.Suffix or ""
-            local callback  = config.Callback     or function() end
+            local increment = config.Increment or 1
+            local suffix    = config.ValueName or config.Suffix or ""
+            local callback  = config.Callback or function() end
 
             local Row = Instance.new("Frame")
             Row.Size             = UDim2.new(1, 0, 0, 50)
@@ -782,7 +797,7 @@ function DaleyUI:CreateWindow(config)
                 local val = math.clamp(math.round((min + pct*(max-min)) / increment) * increment, min, max)
                 Fill.Size    = UDim2.new((val-min)/(max-min), 0, 1, 0)
                 ValLbl.Text  = (increment < 1 and string.format("%.1f", val) or tostring(math.round(val)))
-                              .. (suffix ~= "" and (" " .. suffix) or "")
+                             .. (suffix ~= "" and (" " .. suffix) or "")
                 callback(val)
             end
 
@@ -802,9 +817,16 @@ function DaleyUI:CreateWindow(config)
             end)
         end
 
-        function Tab:CreateButton(config)
-            config = config or {}
-            local text     = config.Name     or "Button"
+        function Tab:CreateButton(arg1, arg2)
+            local config = {}
+            if typeof(arg1) == "table" then
+                config = arg1
+            else
+                config.Name = arg1
+                config.Callback = arg2
+            end
+
+            local text     = config.Name or "Button"
             local callback = config.Callback or function() end
 
             local Row = Instance.new("Frame")
@@ -846,10 +868,18 @@ function DaleyUI:CreateWindow(config)
             end)
         end
 
-        function Tab:CreateTextBox(config)
-            config = config or {}
-            local placeholder = config.Name or config.PlaceholderText or "Enter text..."
-            local callback    = config.Callback    or function() end
+        function Tab:CreateTextBox(arg1, arg2, arg3)
+            local config = {}
+            if typeof(arg1) == "table" then
+                config = arg1
+            else
+                config.Name = arg1
+                config.PlaceholderText = arg2
+                config.Callback = arg3
+            end
+
+            local placeholder = config.PlaceholderText or config.Name or "Enter text..."
+            local callback    = config.Callback or function() end
 
             local Row = Instance.new("Frame")
             Row.Size             = UDim2.new(1, 0, 0, 38)
@@ -900,13 +930,20 @@ function DaleyUI:CreateWindow(config)
             end)
         end
 
-        -- Alias for CreateTextBox so scripts calling CreateInput do not break
         Tab.CreateInput = Tab.CreateTextBox
 
-        function Tab:CreateDropdown(config)
-            config = config or {}
-            local text     = config.Name     or "Dropdown"
-            local list     = config.Options  or {}
+        function Tab:CreateDropdown(arg1, arg2, arg3)
+            local config = {}
+            if typeof(arg1) == "table" then
+                config = arg1
+            else
+                config.Name = arg1
+                config.Options = arg2
+                config.Callback = arg3
+            end
+
+            local text     = config.Name or "Dropdown"
+            local list     = config.Options or {}
             local callback = config.Callback or function() end
 
             local Wrapper = Instance.new("Frame")
@@ -929,11 +966,12 @@ function DaleyUI:CreateWindow(config)
             Lbl.ZIndex                 = 6
             Lbl.Parent                 = Wrapper
 
+            local initialVal = typeof(list[1]) == "table" and list[1][1] or list[1]
             local SelBtn = Instance.new("TextButton")
             SelBtn.Size             = UDim2.new(0, 138, 0, 26)
             SelBtn.Position         = UDim2.new(1, -148, 0.5, -13)
             SelBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-            SelBtn.Text             = list[1] or "Select"
+            SelBtn.Text             = tostring(initialVal or "Select")
             SelBtn.TextColor3       = Color3.fromRGB(235, 235, 242)
             SelBtn.TextSize         = 11
             SelBtn.Font             = Enum.Font.GothamBold
@@ -942,7 +980,6 @@ function DaleyUI:CreateWindow(config)
             SelBtn.Parent           = Wrapper
             Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 6)
 
-            -- DropFrame parented to OverlayContainer so it never gets clipped by Page bounds
             local DropFrame = Instance.new("ScrollingFrame")
             DropFrame.Size                   = UDim2.new(0, 138, 0, math.clamp(#list * 28, 0, 140))
             DropFrame.BackgroundColor3       = Color3.fromRGB(20, 20, 25)
@@ -996,10 +1033,11 @@ function DaleyUI:CreateWindow(config)
             end)
 
             local function createOptionButton(item)
+                local displayItem = typeof(item) == "table" and item[1] or item
                 local Opt = Instance.new("TextButton")
                 Opt.Size                   = UDim2.new(1, -6, 0, 28)
                 Opt.BackgroundTransparency = 1
-                Opt.Text                   = item
+                Opt.Text                   = tostring(displayItem)
                 Opt.TextColor3             = Color3.fromRGB(180, 180, 188)
                 Opt.TextSize               = 11
                 Opt.Font                   = Enum.Font.GothamMedium
@@ -1014,8 +1052,8 @@ function DaleyUI:CreateWindow(config)
                 end)
                 Opt.MouseButton1Click:Connect(function()
                     setOpenState(false)
-                    SelBtn.Text = item
-                    callback(item)
+                    SelBtn.Text = tostring(displayItem)
+                    callback(displayItem)
                 end)
             end
 
@@ -1041,21 +1079,20 @@ function DaleyUI:CreateWindow(config)
                     end
                     local found = false
                     for _, item in ipairs(newList) do
-                        if item == SelBtn.Text then
+                        local displayItem = typeof(item) == "table" and item[1] or item
+                        if tostring(displayItem) == SelBtn.Text then
                             found = true
                             break
                         end
                     end
                     if not found then
-                        SelBtn.Text = newList[1] or "Select"
+                        local firstVal = typeof(newList[1]) == "table" and newList[1][1] or newList[1]
+                        SelBtn.Text = tostring(firstVal or "Select")
                     end
                 end
             }
         end
 
-        -- =====================================================================
-        -- [[ DYNAMIC ROTATABLE COLOR WHEEL ELEMENT ]] --
-        -- =====================================================================
         function Tab:CreateColorPicker(config)
             config = config or {}
             local name = config.Name or "Color Picker"
@@ -1226,9 +1263,7 @@ function DaleyUI:CreateWindow(config)
         return Tab
     end
 
-    -- =========================================================================
-    -- [[ AUTOMATIC COMBINED "UI Settings" TAB GENERATION ]] --
-    -- =========================================================================
+    -- AUTOMATIC "UI Settings" TAB
     local MiscTab = Window:CreateTab("UI Settings", 9999)
 
     MiscTab:CreateSection("Customization Settings")
